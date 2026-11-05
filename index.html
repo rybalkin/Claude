@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zürich to Florence by Train</title>
+<meta name="description" content="An animated journey by rail from Zürich through the Gotthard Base Tunnel and Milan to Florence.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4efe6;
+    --panel: #fffaf2;
+    --ink: #2a2622;
+    --muted: #7a7068;
+    --line: #e2d8c9;
+    --land: #efe7d8;
+    --land-ch: #f2e9da;
+    --land-it: #ece2cf;
+    --water: #b9d4e2;
+    --mountain: #d6c8b1;
+    --border: #b09a80;
+    --rail: #c8bba8;
+    --done: #c0392b;
+    --tunnel: #6d5d4f;
+    --accent: #c0392b;
+    --accent-soft: #f6dcd6;
+    --train: #c0392b;
+    --chip: #f0e6d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15181c; --panel: #1d2126; --ink: #ece6dc; --muted: #9b958c; --line: #2f343b;
+      --land: #20252b; --land-ch: #232930; --land-it: #1f242a; --water: #2b4656; --mountain: #353a40;
+      --border: #6b6258; --rail: #4a4f56; --done: #ff6b5a; --tunnel: #b5a79a; --accent: #ff6b5a;
+      --accent-soft: #3a2422; --train: #ff6b5a; --chip: #272c32;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15181c; --panel: #1d2126; --ink: #ece6dc; --muted: #9b958c; --line: #2f343b;
+    --land: #20252b; --land-ch: #232930; --land-it: #1f242a; --water: #2b4656; --mountain: #353a40;
+    --border: #6b6258; --rail: #4a4f56; --done: #ff6b5a; --tunnel: #b5a79a; --accent: #ff6b5a;
+    --accent-soft: #3a2422; --train: #ff6b5a; --chip: #272c32;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.5 Inter, system-ui, sans-serif;
+  }
+  header { max-width: 1200px; margin: 0 auto; padding: 28px 16px 8px; }
+  h1 { font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: clamp(28px, 5vw, 44px); margin: 0; line-height: 1.1; }
+  h1 .arrow { color: var(--accent); }
+  .sub { color: var(--muted); margin: 6px 0 0; }
+  main {
+    max-width: 1200px; margin: 0 auto; padding: 16px;
+    display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start;
+  }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+  .map-card { padding: 8px; position: sticky; top: 12px; }
+  @media (max-width: 860px) { .map-card { position: static; } }
+  svg#map { width: 100%; height: auto; display: block; border-radius: 10px; touch-action: none; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 8px 4px; }
+  button {
+    font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--chip); color: var(--ink);
+    border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-width: 92px; }
+  button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  input[type=range] { flex: 1 1 160px; accent-color: var(--accent); }
+  .speed { display: flex; gap: 4px; }
+  .speed button { padding: 5px 10px; font-size: 13px; }
+
+  .side { display: grid; gap: 16px; }
+  .status { padding: 18px; }
+  .clock { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .clock .time { font-family: Fraunces, Georgia, serif; font-size: 42px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .clock .elapsed { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .where { font-size: 18px; font-weight: 600; margin: 12px 0 4px; }
+  .note { color: var(--muted); margin: 0; min-height: 3em; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+  .stat { background: var(--chip); border-radius: 10px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .bar { height: 6px; background: var(--chip); border-radius: 99px; overflow: hidden; margin-top: 14px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+
+  .timeline { padding: 14px 18px; }
+  .timeline h2, .facts h2 { font-family: Fraunces, Georgia, serif; font-size: 20px; margin: 0 0 8px; }
+  .dep { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  .dep input { font: inherit; color: var(--ink); background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; }
+  ol.stops { list-style: none; margin: 0; padding: 0; position: relative; }
+  ol.stops::before { content: ""; position: absolute; left: 63px; top: 10px; bottom: 10px; width: 2px; background: var(--line); }
+  ol.stops li {
+    display: grid; grid-template-columns: 52px 22px 1fr; align-items: center; gap: 0;
+    padding: 5px 0; cursor: pointer; border-radius: 8px;
+  }
+  ol.stops li:hover { background: var(--chip); }
+  ol.stops .t { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; text-align: right; padding-right: 6px; }
+  ol.stops .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--rail); background: var(--panel); justify-self: center; position: relative; z-index: 1; }
+  ol.stops .name { padding-left: 8px; }
+  ol.stops .name small { color: var(--muted); display: block; font-size: 12px; line-height: 1.3; }
+  ol.stops li.passed .dot { background: var(--done); border-color: var(--done); }
+  ol.stops li.current .name { font-weight: 600; }
+  ol.stops li.current .dot { box-shadow: 0 0 0 4px var(--accent-soft); border-color: var(--accent); }
+  ol.stops li.change { margin: 4px 0; }
+  ol.stops li.change .name { color: var(--accent); font-size: 13px; }
+
+  .facts { padding: 14px 18px 18px; }
+  .facts ul { margin: 0; padding-left: 18px; }
+  .facts li { margin: 4px 0; }
+  footer { max-width: 1200px; margin: 0 auto; padding: 8px 16px 32px; color: var(--muted); font-size: 12px; }
+
+  /* map */
+  .lbl { font: 600 13px Inter, sans-serif; fill: var(--ink); paint-order: stroke; stroke: var(--land); stroke-width: 4px; stroke-linejoin: round; }
+  .lbl.small { font-weight: 500; font-size: 11px; fill: var(--muted); }
+  .country { font: 600 12px Inter, sans-serif; letter-spacing: .35em; fill: var(--border); opacity: .9; }
+  .region { font: italic 500 12px Fraunces, Georgia, serif; fill: var(--muted); }
+  .train-dot { transition: opacity .3s; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Zürich <span class="arrow">→</span> Firenze</h1>
+  <p class="sub">Under the Alps and across the Po Valley: one day, two trains, about 590 km.</p>
+</header>
+
+<main>
+  <section class="card map-card" aria-label="Route map">
+    <svg id="map" viewBox="0 0 640 920" role="img" aria-label="Map of the rail route from Zürich to Florence"></svg>
+    <div class="controls">
+      <button id="play" class="primary">▶ Play</button>
+      <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Journey progress">
+      <div class="speed" role="group" aria-label="Playback speed">
+        <button data-speed="1">1×</button>
+        <button data-speed="3" aria-pressed="true">3×</button>
+        <button data-speed="8">8×</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="side">
+    <section class="card status" aria-live="polite">
+      <div class="clock"><span class="time" id="clock">09:33</span><span class="elapsed" id="elapsed">0 h 00 min underway</span></div>
+      <div class="where" id="where">Zürich HB</div>
+      <p class="note" id="note"></p>
+      <div class="stats">
+        <div class="stat"><b id="speed">0</b><span>km/h</span></div>
+        <div class="stat"><b id="dist">0</b><span>km travelled</span></div>
+        <div class="stat"><b id="next">–</b><span id="nextLbl">next stop</span></div>
+      </div>
+      <div class="bar"><i id="bar"></i></div>
+    </section>
+
+    <section class="card timeline">
+      <h2>Timetable</h2>
+      <label class="dep">Depart Zürich at <input type="time" id="depTime" value="09:33"></label>
+      <ol class="stops" id="stops"></ol>
+    </section>
+
+    <section class="card facts">
+      <h2>Along the way</h2>
+      <ul>
+        <li><b>Gotthard Base Tunnel</b> — 57.1 km, the longest railway tunnel in the world, opened in 2016. The train runs up to 2,300 m below the mountains.</li>
+        <li><b>Ceneri Base Tunnel</b> — 15.4 km, completing the flat route through the Alps in 2020.</li>
+        <li><b>Chiasso</b> — the border. You arrive in Switzerland and leave in Italy.</li>
+        <li><b>Milano Centrale</b> — change to an Italian high-speed train for the run south.</li>
+        <li><b>Bologna–Firenze</b> — about 73 of its 79 km run in tunnels under the Apennines.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+<footer>Times, speeds and the map are approximate and for illustration only. Check SBB or Trenitalia for real timetables.</footer>
+
+<script>
+(() => {
+  // ---------- projection ----------
+  const LON0 = 7.85, LAT0 = 47.65, K = 220, COS = Math.cos(45.6 * Math.PI / 180);
+  const P = (lat, lon) => [ (lon - LON0) * COS * K, (LAT0 - lat) * K ];
+  const pts = arr => arr.map(([a, o]) => P(a, o).map(v => v.toFixed(1)).join(',')).join(' ');
+  const pathD = (arr, close) => 'M' + arr.map(([a, o]) => P(a, o).map(v => v.toFixed(1)).join(' ')).join(' L') + (close ? ' Z' : '');
+  const smooth = (arr, close) => {
+    const p = arr.map(([a, o]) => P(a, o));
+    if (close) p.push(p[0], p[1]);
+    let d = `M${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)}`;
+    for (let i = 1; i < p.length - 1; i++) {
+      const mx = (p[i][0] + p[i + 1][0]) / 2, my = (p[i][1] + p[i + 1][1]) / 2;
+      d += ` Q${p[i][0].toFixed(1)} ${p[i][1].toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`;
+    }
+    return d + (close ? ' Z' : ` L${p[p.length-1][0].toFixed(1)} ${p[p.length-1][1].toFixed(1)}`);
+  };
+
+  // ---------- route: [lat, lon, minutesFromStart, opts] ----------
+  // stations have name; stops have arr/dep
+  const R = [
+    { lat: 47.378, lon: 8.540, t: 0, name: 'Zürich HB', sub: 'EuroCity to Milano', stop: true, note: 'Departing Zürich Hauptbahnhof on the EuroCity towards Milano. Lake Zürich soon appears on the left.' },
+    { lat: 47.295, lon: 8.565, t: 9, note: 'Running along the western shore of Lake Zürich.' },
+    { lat: 47.173, lon: 8.515, t: 22, dwell: 2, name: 'Zug', stop: true, note: 'A short stop in Zug, beside its lake.' },
+    { lat: 47.049, lon: 8.548, t: 36, dwell: 2, name: 'Arth-Goldau', stop: true, note: 'Arth-Goldau, at the foot of the Rigi. The mountains begin here.' },
+    { lat: 46.995, lon: 8.605, t: 42, note: 'Along the Urnersee, the southern arm of Lake Lucerne.' },
+    { lat: 46.902, lon: 8.623, t: 48, note: 'Flüelen: the valley of the Reuss narrows towards the Gotthard.' },
+    { lat: 46.822, lon: 8.651, t: 53, name: 'Erstfeld portal', minor: true, tunnelStart: 'Gotthard Base Tunnel', note: 'Into the Gotthard Base Tunnel — 57 km of darkness at up to 200 km/h.' },
+    { lat: 46.62, lon: 8.78, t: 62, inTunnel: true, note: 'Deep inside the Gotthard, about 2,300 m of rock overhead. Rock temperature is around 45 °C.' },
+    { lat: 46.378, lon: 8.909, t: 71, name: 'Bodio portal', minor: true, tunnelEnd: true, note: 'Out into the sunshine of Ticino, the Italian-speaking part of Switzerland.' },
+    { lat: 46.359, lon: 8.970, t: 74, note: 'Down the Riviera valley past Biasca.' },
+    { lat: 46.195, lon: 9.029, t: 84, dwell: 2, name: 'Bellinzona', stop: true, note: 'Bellinzona and its three medieval castles.' },
+    { lat: 46.16, lon: 9.00, t: 88, tunnelStart: 'Ceneri Base Tunnel', note: 'Into the Ceneri Base Tunnel, 15.4 km under Monte Ceneri.' },
+    { lat: 46.03, lon: 8.94, t: 96, tunnelEnd: true, note: 'Out of the Ceneri at Vezia, just above Lugano.' },
+    { lat: 46.005, lon: 8.947, t: 99, dwell: 3, name: 'Lugano', stop: true, note: 'Lugano, with views down to the lake and Monte San Salvatore.' },
+    { lat: 45.955, lon: 8.950, t: 106, note: 'Crossing Lake Lugano on the Melide causeway.' },
+    { lat: 45.875, lon: 8.980, t: 115, note: 'Through Mendrisio and its vineyards.' },
+    { lat: 45.832, lon: 9.031, t: 121, dwell: 4, name: 'Chiasso', sub: 'Border: Switzerland / Italy', stop: true, border: true, note: 'Chiasso — the border station. Benvenuti in Italia!' },
+    { lat: 45.809, lon: 9.073, t: 129, dwell: 2, name: 'Como S. Giovanni', stop: true, note: 'Como, at the southern tip of its famous lake.' },
+    { lat: 45.578, lon: 9.273, t: 155, note: 'Through the Brianza towards Monza.' },
+    { lat: 45.486, lon: 9.204, t: 172, name: 'Milano Centrale', sub: 'Change to Frecciarossa', stop: true, change: 23, note: 'Milano Centrale. Change trains under the great iron roof — 23 minutes to catch the Frecciarossa south.' },
+    { lat: 45.31, lon: 9.50, t: 210, note: 'On the high-speed line across the Lombard plain, up to 300 km/h.' },
+    { lat: 45.06, lon: 9.69, t: 217, note: 'Crossing the Po, Italy\'s longest river, near Piacenza.' },
+    { lat: 44.80, lon: 10.33, t: 228, note: 'Through Emilia: the land of Parmigiano and prosciutto di Parma.' },
+    { lat: 44.733, lon: 10.66, t: 232, name: 'Reggio Emilia AV', minor: true, note: 'Past Calatrava\'s white arches at Reggio Emilia AV Mediopadana.' },
+    { lat: 44.62, lon: 10.95, t: 239, note: 'Skirting Modena, home of balsamic vinegar.' },
+    { lat: 44.506, lon: 11.343, t: 250, dwell: 3, name: 'Bologna Centrale', stop: true, note: 'Bologna Centrale — the high-speed platforms are deep underground.' },
+    { lat: 44.43, lon: 11.31, t: 256, tunnelStart: 'Apennine tunnels', note: 'Into the Apennines: almost the whole way to Florence is underground.' },
+    { lat: 44.20, lon: 11.24, t: 266, inTunnel: true, note: 'Inside the Vaglia and Firenzuola tunnels, under the Apennine ridge.' },
+    { lat: 43.86, lon: 11.22, t: 282, tunnelEnd: true, note: 'Out of the hills into the Arno valley. The Duomo is near.' },
+    { lat: 43.776, lon: 11.248, t: 288, name: 'Firenze S. M. Novella', stop: true, final: true, note: 'Arrived in Firenze Santa Maria Novella. Benvenuti a Firenze!' }
+  ];
+
+  // expand into time-keyed frames: each point gets arr/dep
+  const frames = [];
+  let shift = 0;
+  R.forEach(p => {
+    const arr = p.t + shift;
+    const extra = (p.dwell || 0) + (p.change || 0);
+    shift += extra;
+    p.arr = arr; p.dep = arr + extra;
+    p.xy = P(p.lat, p.lon);
+  });
+  const TOTAL = R[R.length - 1].arr;
+
+  // distances (rail ≈ 1.12 × straight line)
+  const hav = (a, b) => {
+    const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+    return 2 * 6371 * Math.asin(Math.sqrt(h));
+  };
+  R[0].km = 0;
+  for (let i = 1; i < R.length; i++) R[i].km = R[i - 1].km + hav(R[i - 1], R[i]) * 1.12;
+  const TOTAL_KM = R[R.length - 1].km;
+
+  // tunnel flags per segment i (between R[i] and R[i+1])
+  let inT = null;
+  R.forEach((p, i) => {
+    if (p.tunnelStart) inT = p.tunnelStart;
+    if (p.tunnelEnd) inT = null;
+    p.segTunnel = inT;
+  });
+
+  // ---------- draw map ----------
+  const svg = document.getElementById('map');
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, parent = svg) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    parent.appendChild(e); return e;
+  };
+
+  // background (Italy colour), Switzerland polygon on top
+  el('rect', { x: 0, y: 0, width: 640, height: 920, fill: 'var(--land-it)' });
+  const CH = [[47.65,7.8],[47.65,12],[46.95,12],[46.85,10.47],[46.6,10.45],[46.55,10.15],[46.25,10.05],[46.3,9.7],[46.5,9.45],[46.35,9.25],[46.05,9.2],[45.9,9.05],[45.82,9.05],[45.82,8.95],[45.95,8.85],[46.0,8.72],[46.1,8.6],[46.25,8.45],[46.45,8.1],[46.3,7.8]];
+  el('path', { d: pathD(CH, true), fill: 'var(--land-ch)' });
+  el('path', { d: pathD(CH.slice(2, 19)), fill: 'none', stroke: 'var(--border)', 'stroke-width': 1.4, 'stroke-dasharray': '6 4' });
+
+  // mountains
+  const tri = (lat, lon, s) => { const [x, y] = P(lat, lon); return `M${x-s} ${y+s*0.6} L${x} ${y-s*0.8} L${x+s} ${y+s*0.6} Z`; };
+  const peaks = [];
+  for (let i = 0; i < 46; i++) {
+    const lat = 46.35 + ((i * 37) % 23) / 23 * 0.62;
+    const lon = 7.95 + ((i * 53) % 46) / 46 * 2.6;
+    const [x] = P(lat, lon);
+    if (Math.abs(lon - (8.55 + (47 - lat) * 0.6)) < 0.12) continue; // keep the route valley clear-ish
+    peaks.push(tri(lat, lon, 9 + (i % 3) * 3));
+  }
+  for (let i = 0; i < 24; i++) {
+    const f = i / 23;
+    const lat = 44.72 - f * 0.85 + ((i * 7) % 5) * 0.03;
+    const lon = 9.2 + f * 2.5 + ((i * 11) % 4) * 0.05;
+    if (Math.abs(lon - 11.28) < 0.1) continue;
+    peaks.push(tri(lat, lon, 7 + (i % 3) * 2));
+  }
+  el('path', { d: peaks.join(' '), fill: 'var(--mountain)', opacity: 0.9 });
+
+  // lakes
+  const lakes = [
+    [[47.37,8.545],[47.31,8.575],[47.26,8.66],[47.22,8.8],[47.21,8.86],[47.235,8.87],[47.26,8.75],[47.29,8.65],[47.34,8.58]],
+    [[47.18,8.495],[47.12,8.47],[47.06,8.49],[47.04,8.52],[47.1,8.515],[47.16,8.525]],
+    [[47.0,8.3],[47.03,8.42],[46.99,8.5],[47.0,8.6],[46.92,8.6],[46.9,8.625],[46.97,8.635],[47.02,8.57],[46.97,8.42]],
+    [[46.02,8.95],[45.97,8.92],[45.92,8.95],[45.92,8.98],[45.97,8.97],[46.0,9.05],[46.04,9.12],[46.05,9.07]],
+    [[46.18,8.8],[46.0,8.65],[45.9,8.52],[45.73,8.56],[45.77,8.63],[45.93,8.62],[46.05,8.75],[46.16,8.86]],
+    [[45.81,9.07],[45.9,9.15],[45.98,9.23],[46.1,9.28],[46.18,9.38],[46.15,9.42],[46.0,9.28],[45.85,9.4],[45.84,9.42],[45.97,9.26],[45.88,9.17],[45.82,9.1]]
+  ];
+  lakes.forEach(l => el('path', { d: smooth(l, true), fill: 'var(--water)' }));
+  // rivers
+  el('path', { d: smooth([[45.13,8.0],[45.08,8.6],[45.15,9.2],[45.1,9.6],[45.03,9.9],[44.97,10.4],[45.02,10.9],[44.95,11.5],[44.98,12.2]]), fill: 'none', stroke: 'var(--water)', 'stroke-width': 3.5, 'stroke-linecap': 'round' });
+  el('path', { d: smooth([[43.66,10.6],[43.72,10.95],[43.77,11.25],[43.77,11.45],[43.88,11.6]]), fill: 'none', stroke: 'var(--water)', 'stroke-width': 3, 'stroke-linecap': 'round' });
+  el('path', { d: smooth([[46.9,8.63],[46.75,8.67],[46.62,8.6]]), fill: 'none', stroke: 'var(--water)', 'stroke-width': 2 });
+  el('path', { d: smooth([[46.45,8.75],[46.3,8.97],[46.19,9.02],[46.16,8.85]]), fill: 'none', stroke: 'var(--water)', 'stroke-width': 2 });
+
+  // labels
+  const txt = (s, lat, lon, cls, anchor = 'start') => { const [x, y] = P(lat, lon); const t = el('text', { x, y, class: cls, 'text-anchor': anchor }); t.textContent = s; return t; };
+  txt('SWITZERLAND', 47.5, 9.55, 'country', 'middle');
+  txt('ITALY', 45.38, 10.6, 'country', 'middle');
+  txt('Alps', 46.55, 9.95, 'region', 'middle');
+  txt('Po', 45.07, 10.62, 'region', 'middle');
+  txt('Apennines', 44.18, 10.3, 'region', 'middle');
+  txt('Lago Maggiore', 45.78, 8.45, 'region', 'end');
+  txt('Lago di Como', 46.12, 9.48, 'region');
+  txt('Arno', 43.68, 10.85, 'region', 'middle');
+
+  // rail line (full, then progress overlay)
+  const routeD = 'M' + R.map(p => p.xy.map(v => v.toFixed(1)).join(' ')).join(' L');
+  el('path', { d: routeD, fill: 'none', stroke: 'var(--rail)', 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+  // tunnels drawn dashed on top
+  for (let i = 0; i < R.length - 1; i++) {
+    if (R[i].segTunnel) el('line', { x1: R[i].xy[0], y1: R[i].xy[1], x2: R[i+1].xy[0], y2: R[i+1].xy[1], stroke: 'var(--land-ch)', 'stroke-width': 3, 'stroke-dasharray': '3 4' });
+  }
+  const done = el('path', { d: routeD, fill: 'none', stroke: 'var(--done)', 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+  const routeLen = done.getTotalLength();
+  // cumulative path length at each vertex
+  let acc = 0; R[0].len = 0;
+  for (let i = 1; i < R.length; i++) { acc += Math.hypot(R[i].xy[0] - R[i-1].xy[0], R[i].xy[1] - R[i-1].xy[1]); R[i].len = acc; }
+  const lenScale = routeLen / acc;
+  done.setAttribute('stroke-dasharray', `${routeLen} ${routeLen}`);
+  done.setAttribute('stroke-dashoffset', routeLen);
+
+  // tunnel labels
+  const tlab = (s, a, b, dx) => { const x = (R[a].xy[0] + R[b].xy[0]) / 2 + dx, y = (R[a].xy[1] + R[b].xy[1]) / 2; const t = el('text', { x, y, class: 'lbl small', 'text-anchor': dx < 0 ? 'end' : 'start' }); t.textContent = s; };
+  tlab('Gotthard Base Tunnel', 6, 8, 12);
+  tlab('Ceneri', 11, 12, -10);
+  tlab('Apennine tunnels', 26, 28, -12);
+
+  // stations
+  const labelPos = { 'Zürich HB': [10, 4], 'Zug': [-10, 4, 'end'], 'Arth-Goldau': [-10, 4, 'end'], 'Bellinzona': [10, 4], 'Lugano': [-10, 4, 'end'], 'Chiasso': [-10, 6, 'end'], 'Como S. Giovanni': [10, -2], 'Milano Centrale': [-10, 4, 'end'], 'Bologna Centrale': [10, 4, 'start', 'Bologna'], 'Firenze S. M. Novella': [-10, 4, 'end', 'Firenze'], 'Reggio Emilia AV': [-6, 16, 'middle'] };
+  R.forEach(p => {
+    if (!p.name || p.name.includes('portal')) return;
+    const [x, y] = p.xy;
+    const big = p.stop;
+    p.dotEl = el('circle', { cx: x, cy: y, r: big ? 5.5 : 3.5, fill: 'var(--panel)', stroke: 'var(--ink)', 'stroke-width': big ? 2 : 1.5 });
+    const [dx, dy, anc, short] = labelPos[p.name] || [10, 4];
+    const t = el('text', { x: x + dx, y: y + dy, class: big ? 'lbl' : 'lbl small', 'text-anchor': anc || 'start' });
+    t.textContent = short || p.name;
+  });
+
+  // train marker
+  const train = el('g', { class: 'train-dot' });
+  el('circle', { r: 14, fill: 'var(--train)', opacity: 0.18 }, train);
+  el('circle', { r: 8, fill: 'var(--train)', stroke: '#fff', 'stroke-width': 2.5 }, train);
+
+  // ---------- timetable ----------
+  const stopsEl = document.getElementById('stops');
+  const listed = R.filter(p => p.stop);
+  const rows = [];
+  listed.forEach(p => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="t"></span><span class="dot"></span><span class="name">${p.name}${p.sub ? `<small>${p.sub}</small>` : ''}</span>`;
+    li.addEventListener('click', () => { setT(p.arr); pause(); });
+    stopsEl.appendChild(li);
+    rows.push({ p, li, t: li.querySelector('.t') });
+    if (p.change) {
+      const c = document.createElement('li');
+      c.className = 'change';
+      c.innerHTML = `<span class="t"></span><span></span><span class="name">⇄ ${p.change} min change · Frecciarossa to Firenze</span>`;
+      stopsEl.appendChild(c);
+      rows[rows.length - 1].ct = c.querySelector('.t');
+    }
+  });
+
+  // ---------- state ----------
+  const $ = id => document.getElementById(id);
+  let depMin = 9 * 60 + 33;
+  let T = 0, playing = false, speed = 3, last = null;
+  const fmtClock = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+  const fmtDur = m => `${Math.floor(m / 60)} h ${String(Math.floor(m % 60)).padStart(2, '0')} min`;
+
+  function renderTimes() {
+    rows.forEach(r => {
+      r.t.textContent = fmtClock(depMin + r.p.arr);
+      if (r.ct) r.ct.textContent = fmtClock(depMin + r.p.dep);
+    });
+  }
+
+  function locate(t) {
+    for (let i = 0; i < R.length - 1; i++) {
+      const a = R[i], b = R[i + 1];
+      if (t <= a.dep) return { i, f: 0, atStop: t >= a.arr && a.dep > a.arr ? a : (t <= a.arr && i === 0 ? a : null), seg: a };
+      if (t < b.arr) return { i, f: (t - a.dep) / (b.arr - a.dep), seg: a };
+    }
+    const z = R[R.length - 1];
+    return { i: R.length - 1, f: 0, atStop: z, seg: z };
+  }
+
+  function update() {
+    const L = locate(T);
+    const a = R[L.i], b = R[Math.min(L.i + 1, R.length - 1)];
+    const len = (a.len + (b.len - a.len) * L.f) * lenScale;
+    const pt = done.getPointAtLength(Math.min(len, routeLen));
+    train.setAttribute('transform', `translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)})`);
+    done.setAttribute('stroke-dashoffset', routeLen - len);
+    const tunnel = !L.atStop && L.f > 0 && a.segTunnel;
+    train.style.opacity = tunnel ? 0.45 : 1;
+
+    const km = a.km + (b.km - a.km) * L.f;
+    const moving = !L.atStop && T > 0 && T < TOTAL;
+    const segSpeed = moving ? (b.km - a.km) / ((b.arr - a.dep) / 60) : 0;
+    $('speed').textContent = Math.round(segSpeed);
+    $('dist').textContent = Math.round(km);
+    $('clock').textContent = fmtClock(depMin + T);
+    $('elapsed').textContent = T >= TOTAL ? `Journey time ${fmtDur(TOTAL)}` : `${fmtDur(T)} underway`;
+    $('bar').style.width = (T / TOTAL * 100) + '%';
+    $('scrub').value = Math.round(T / TOTAL * 1000);
+
+    // where + note
+    let where, note;
+    const nextStop = R.find(p => p.stop && p.arr > T + 0.01);
+    const prevStop = [...R].reverse().find(p => p.stop && p.arr <= T + 0.01);
+    if (L.atStop) {
+      where = L.atStop.final ? `🏁 ${L.atStop.name}` : `🚉 ${L.atStop.name}`;
+      note = L.atStop.note;
+    } else if (tunnel) {
+      where = `🚇 ${a.segTunnel}`;
+      note = a.note;
+    } else {
+      where = `🚆 ${prevStop ? prevStop.name : ''} → ${nextStop ? nextStop.name : ''}`;
+      note = (L.f > 0.5 && b.note && !b.stop && !b.tunnelStart) ? b.note : a.note;
+    }
+    $('where').textContent = where;
+    $('note').textContent = note || '';
+    if (nextStop && T < TOTAL) {
+      $('next').textContent = fmtClock(depMin + nextStop.arr);
+      $('nextLbl').textContent = nextStop.name.replace(' Centrale', '').replace(' S. M. Novella', '');
+    } else { $('next').textContent = '✓'; $('nextLbl').textContent = 'arrived'; }
+
+    // timetable + dots
+    rows.forEach(r => {
+      const passed = r.p.arr <= T + 0.01;
+      const current = r.p === (L.atStop || null) || (!L.atStop && r.p === nextStop);
+      r.li.classList.toggle('passed', passed);
+      r.li.classList.toggle('current', current);
+    });
+    R.forEach(p => { if (p.dotEl) p.dotEl.setAttribute('fill', p.arr <= T + 0.01 ? 'var(--done)' : 'var(--panel)'); });
+  }
+
+  function setT(t) { T = Math.max(0, Math.min(TOTAL, t)); update(); }
+  function play() { if (T >= TOTAL) T = 0; playing = true; last = null; $('play').textContent = '❚❚ Pause'; requestAnimationFrame(tick); }
+  function pause() { playing = false; $('play').textContent = T >= TOTAL ? '↺ Replay' : '▶ Play'; }
+  function tick(ts) {
+    if (!playing) return;
+    if (last != null) {
+      const dt = Math.min(0.1, (ts - last) / 1000);
+      // 1× = 1 journey-minute per 0.4 s
+      setT(T + dt * speed * 2.5);
+      if (T >= TOTAL) { pause(); return; }
+    }
+    last = ts;
+    requestAnimationFrame(tick);
+  }
+
+  $('play').addEventListener('click', () => playing ? pause() : play());
+  $('scrub').addEventListener('input', e => { pause(); setT(e.target.value / 1000 * TOTAL); });
+  document.querySelectorAll('.speed button').forEach(b => b.addEventListener('click', () => {
+    speed = +b.dataset.speed;
+    document.querySelectorAll('.speed button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+  $('depTime').addEventListener('change', e => {
+    const [h, m] = (e.target.value || '09:33').split(':').map(Number);
+    depMin = h * 60 + m; renderTimes(); update();
+  });
+
+  // drag on map to scrub to nearest point
+  const toSvg = ev => { const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+  function nearestT(p) {
+    let best = { d: Infinity, t: 0 };
+    for (let i = 0; i < R.length - 1; i++) {
+      const a = R[i].xy, b = R[i + 1].xy, vx = b[0] - a[0], vy = b[1] - a[1];
+      const f = Math.max(0, Math.min(1, ((p.x - a[0]) * vx + (p.y - a[1]) * vy) / (vx * vx + vy * vy)));
+      const d = Math.hypot(a[0] + vx * f - p.x, a[1] + vy * f - p.y);
+      if (d < best.d) best = { d, t: R[i].dep + (R[i + 1].arr - R[i].dep) * f };
+    }
+    return best;
+  }
+  let dragging = false;
+  svg.addEventListener('pointerdown', e => { const n = nearestT(toSvg(e)); if (n.d < 40) { dragging = true; pause(); setT(n.t); svg.setPointerCapture(e.pointerId); } });
+  svg.addEventListener('pointermove', e => { if (dragging) setT(nearestT(toSvg(e)).t); });
+  svg.addEventListener('pointerup', () => dragging = false);
+  document.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); playing ? pause() : play(); } });
+
+  renderTimes();
+  update();
+})();
+</script>
+</body>
+</html>
