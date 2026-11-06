@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Florence on Foot</title>
+<meta name="description" content="A walking map of Florence for a first visit: three walks, why each place matters, and your live GPS position.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  /* Layout: full-height map beside a reading panel; on phones the map sits on top and the panel scrolls below.
+     Palette taken from the Duomo's facade: white Carrara, green Prato serpentine, pink Maremma marble, and gilt bronze. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --w1: #2f6b57;   /* serpentine green */
+    --w2: #b0565f;   /* Maremma pink */
+    --w3: #9a6d14;   /* Ghiberti gilt */
+    --me: #1a73e8;
+    --chip: #eeebe3;
+    --display: "Marcellus", "Trajan Pro", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121715; --panel: #1a201e; --ink: #ebe8e1; --muted: #9ca8a2; --line: #2b3431;
+      --w1: #6db89b; --w2: #e1929a; --w3: #d8ad55; --me: #5ea2ff; --chip: #232b28;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121715; --panel: #1a201e; --ink: #ebe8e1; --muted: #9ca8a2; --line: #2b3431;
+    --w1: #6db89b; --w2: #e1929a; --w3: #d8ad55; --me: #5ea2ff; --chip: #232b28;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.5 var(--body);
+    display: grid; grid-template-columns: minmax(0, 1fr) 420px;
+  }
+  #map { height: 100vh; height: 100dvh; background: var(--bg); }
+  aside {
+    height: 100vh; height: 100dvh; overflow-y: auto;
+    background: var(--panel); border-left: 1px solid var(--line);
+    padding-block: max(20px, env(safe-area-inset-top, 0px)) max(28px, env(safe-area-inset-bottom, 0px));
+    padding-left: 20px; padding-right: max(20px, env(safe-area-inset-right, 0px));
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  @media (max-width: 860px) {
+    body { display: block; }
+    #map { height: 58vh; height: 58svh; position: sticky; top: 0; z-index: 1; }
+    aside {
+      height: auto; overflow: visible; border-left: 0; border-top: 1px solid var(--line);
+      position: relative; z-index: 2;
+      padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    }
+  }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1.1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+  .lede { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  .gps {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    background: var(--chip); border-radius: 12px; padding: 12px 14px;
+  }
+  .gps .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex: none; }
+  .gps.on .dot { background: var(--me); box-shadow: 0 0 0 4px color-mix(in srgb, var(--me) 25%, transparent); }
+  .gps .txt { flex: 1 1 180px; min-width: 0; font-size: .92rem; }
+  .gps .txt b { display: block; font-weight: 600; }
+  button, .btn {
+    font: inherit; font-weight: 600; font-size: .9rem; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    border-radius: 999px; padding: 7px 14px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  }
+  button:hover, .btn:hover { border-color: var(--muted); }
+  button:focus-visible, .btn:focus-visible, .place:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+  button.primary { background: var(--me); border-color: var(--me); color: #fff; }
+
+  .walks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .walks button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .walks .sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+  .walk-intro { border-top: 1px solid var(--line); padding-top: 14px; }
+  .walk-intro h2 { font-family: var(--display); font-weight: 400; font-size: 1.45rem; margin: 2px 0 4px; }
+  .walk-intro p { margin: 0; color: var(--muted); }
+  .walk-intro .meta { font-size: .85rem; margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+  .sortbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sortbar .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .sortbar .seg button { border: 0; border-radius: 0; padding: 5px 12px; background: transparent; }
+  .sortbar .seg button[aria-pressed="true"] { background: var(--chip); }
+  .sortbar .seg button:disabled { opacity: .45; cursor: not-allowed; }
+
+  ol.places { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .place {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px;
+    padding: 12px 8px; border-radius: 10px; cursor: pointer;
+  }
+  .place:hover { background: var(--chip); }
+  .place.active { background: var(--chip); }
+  .num {
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: .85rem; font-variant-numeric: tabular-nums;
+  }
+  .place h3 { margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.25; }
+  .place .area { font-size: .8rem; color: var(--muted); letter-spacing: .04em; }
+  .place .dist { font-size: .8rem; font-weight: 600; color: var(--me); font-variant-numeric: tabular-nums; }
+  .place p { margin: 6px 0 0; font-size: .95rem; }
+  .place .tip { margin-top: 8px; font-size: .9rem; padding-left: 10px; border-left: 2px solid var(--line); color: var(--muted); }
+  .place .tip b { color: var(--ink); font-weight: 600; }
+  .place .acts { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .place:not(.active) .more { display: none; }
+  .place.dim { opacity: .38; }
+
+  .notes { border-top: 1px solid var(--line); padding-top: 14px; font-size: .92rem; }
+  .notes h2 { font-family: var(--display); font-weight: 400; font-size: 1.3rem; margin: 0 0 6px; }
+  .notes ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .fine { font-size: .78rem; color: var(--muted); }
+
+  /* Map pieces */
+  .pin {
+    width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    color: #fff; font: 700 13px/1 var(--body); border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.35); font-variant-numeric: tabular-nums;
+    transition: transform .15s;
+  }
+  .pin.big { transform: scale(1.25); }
+  .pin.dim { opacity: .35; }
+  .me-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 30%, transparent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .me-dot { animation: pulse 2s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--me) 45%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+  }
+  .locate {
+    position: absolute; z-index: 500;
+    right: max(12px, env(safe-area-inset-right, 0px)); bottom: 24px;
+    width: 48px; height: 48px; padding: 0; justify-content: center; border-radius: 50%;
+    background: var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .locate svg { width: 22px; height: 22px; }
+  .locate.on { color: var(--me); }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--panel); color: var(--ink); }
+  .leaflet-popup-content { font: 15px/1.45 var(--body); margin: 12px 14px; }
+  .leaflet-popup-content h4 { font-family: var(--display); font-weight: 400; font-size: 1.15rem; margin: 0 0 4px; }
+  .leaflet-popup-content p { margin: 0 0 8px; }
+  .leaflet-container a.btn { color: var(--ink); }
+  .leaflet-control-attribution { font-size: 10px; }
+  .wrap-map { position: relative; }
+  @media (max-width: 860px) { .wrap-map { position: sticky; top: 0; z-index: 1; } }
+</style>
+</head>
+<body>
+
+<div class="wrap-map">
+  <div id="map" role="region" aria-label="Map of Florence"></div>
+  <button class="locate" id="locateBtn" type="button" aria-label="Show my location">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+  </button>
+</div>
+
+<aside>
+  <header>
+    <div class="eyebrow">Firenze · first visit for two</div>
+    <h1>Florence on Foot</h1>
+    <p class="lede">The historic centre is about 2 km across, so you can walk almost everything. Here are three walks, each about half a day, and the reason every stop is worth your time.</p>
+  </header>
+
+  <div class="gps" id="gps">
+    <span class="dot"></span>
+    <div class="txt" id="gpsTxt"><b>Your location is off</b>Turn it on to see where you are and how far each place is.</div>
+    <button class="primary" id="gpsBtn" type="button">Show me</button>
+  </div>
+
+  <div class="walks" id="walks" role="group" aria-label="Choose a walk"></div>
+
+  <div class="walk-intro" id="walkIntro"></div>
+
+  <div class="sortbar">
+    <span class="eyebrow" id="countLbl">Stops</span>
+    <div class="seg" role="group" aria-label="Sort stops">
+      <button type="button" id="sortWalk" aria-pressed="true">Walk order</button>
+      <button type="button" id="sortNear" aria-pressed="false" disabled title="Turn on your location first">Nearest</button>
+    </div>
+  </div>
+
+  <ol class="places" id="places"></ol>
+
+  <section class="notes">
+    <h2>Good to know</h2>
+    <ul>
+      <li><b>Book ahead</b> for the Accademia (David), the Uffizi and the Duomo dome climb. The dome runs on timed slots that sell out days in advance.</li>
+      <li><b>Churches</b> ask for covered shoulders and knees. A light scarf in a bag solves it.</li>
+      <li><b>At the table</b>, a small <i>coperto</i> (cover charge) per person is normal. Try <i>bistecca alla fiorentina</i> (sold by weight, meant to share), <i>ribollita</i> and a glass of Chianti Classico.</li>
+      <li><b>Paving</b> is old stone and uneven. Comfortable shoes matter more than anything else on this page.</li>
+    </ul>
+    <p class="fine">Lines on the map show the order of each walk, not the exact streets. Tap “Walk here” on any stop for turn-by-turn directions. Walking times assume an easy stroll of about 4.5 km/h. Opening times change by season, so check before you go.</p>
+  </section>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const WALKS = [
+  { id: 1, name: "The Renaissance core", color: "--w1",
+    blurb: "The cathedral, the town hall square, the great gallery and the old bridge. This is the Florence of the Medici and of Brunelleschi, all within ten minutes of each other.",
+    when: "Start early, before the tour groups (8:00–8:30)." },
+  { id: 2, name: "Oltrarno to sunset", color: "--w2",
+    blurb: "Cross to the 'other side of the Arno': artisan workshops, a neighbourhood square, a palace garden, then up the hill for the view everyone remembers.",
+    when: "Start after lunch and time the climb to reach Piazzale Michelangelo about 30 minutes before sunset." },
+  { id: 3, name: "Markets, Michelangelo & Santa Croce", color: "--w3",
+    blurb: "Food markets where Florentines actually shop, the David, the Medici family church, and the basilica where Michelangelo and Galileo are buried.",
+    when: "A morning walk: markets are busiest early and the Sant'Ambrogio stalls close in the early afternoon." }
+];
+
+const PLACES = [
+  // Walk 1
+  { walk: 1, name: "Piazza del Duomo", area: "Cathedral square", lat: 43.77310, lng: 11.25600,
+    why: "Brunelleschi's dome (1420–1436) was the largest built since antiquity, raised without a wooden frame using a herringbone brick pattern nobody fully understands even now. Next to it stand Giotto's bell tower and the Baptistery, whose gilded east doors Michelangelo is said to have called the Gates of Paradise.",
+    tip: "Climb one of the two: the dome (463 steps) puts you inside the frescoed cupola; the bell tower (414 steps) gives you a photo of the dome itself." },
+  { walk: 1, name: "Piazza della Repubblica", area: "Roman forum site", lat: 43.77140, lng: 11.25410,
+    why: "This was the forum of Roman Florentia, the spot where the city was founded in 59 BC. The medieval market and the old Jewish ghetto were cleared in the 1880s, which is why the square looks so much grander than everything around it.",
+    tip: "Take the lift to the rooftop café of the Rinascente department store for a coffee at eye level with the dome." },
+  { walk: 1, name: "Piazza della Signoria", area: "Palazzo Vecchio", lat: 43.76960, lng: 11.25560,
+    why: "Florence's political stage for 700 years. The fortress-like Palazzo Vecchio is still the town hall. The marble David here is a copy, standing exactly where the original stood from 1504 to 1873. The open-air Loggia dei Lanzi holds Cellini's bronze Perseus for free.",
+    tip: "Look for the round plaque in the paving near the fountain: it marks where the friar Savonarola was burned in 1498." },
+  { walk: 1, name: "Uffizi Gallery", area: "Medici offices", lat: 43.76780, lng: 11.25530,
+    why: "Built from 1560 by Vasari as offices (uffizi) for the Medici administration, it became one of the world's first public museums. Botticelli's Birth of Venus and Primavera, Leonardo's Annunciation and Caravaggio's Medusa all hang here.",
+    tip: "Book a timed ticket. Give it two to three hours and take a break on the top-floor terrace café." },
+  { walk: 1, name: "Ponte Vecchio", area: "The old bridge", lat: 43.76800, lng: 11.25310,
+    why: "Shops have lined this bridge since the 1300s. In 1593 Duke Ferdinando I threw out the butchers for the smell and put goldsmiths in, and they are still there. It was the only Florentine bridge the retreating German army did not blow up in 1944. The Vasari Corridor runs along the top, a private passage the Medici used to walk from their offices to the palace without meeting the public.",
+    tip: "Please skip the love padlock: they are removed and attaching one carries a fine. Kiss on the bridge instead." },
+
+  // Walk 2
+  { walk: 2, name: "Ponte Santa Trinita", area: "The best bridge view", lat: 43.76930, lng: 11.25020,
+    why: "Ammannati's elegant elliptical arches (1569) were blown up in 1944 and rebuilt using the original stones, fished out of the Arno. The head of the statue of Spring on the corner was only found in the river in 1961.",
+    tip: "This is the classic place to photograph Ponte Vecchio, especially in the golden hour." },
+  { walk: 2, name: "Wine window, Via Santo Spirito", area: "Buchette del vino", lat: 43.76895, lng: 11.24870,
+    why: "Look for small arched hatches in palace walls. Noble families sold their own wine through them, straight to customers on the street, and during the plague of 1630 they were used for contact-free sales. A few reopened during Covid, and this one serves wine and gelato again.",
+    tip: "Order two glasses of red through the little window and drink them on the street, as Florentines did 400 years ago." },
+  { walk: 2, name: "Piazza Santo Spirito", area: "Oltrarno neighbourhood", lat: 43.76630, lng: 11.24790,
+    why: "The plain, unfinished facade hides Brunelleschi's last church, a perfect grid of grey stone columns. In the sacristy hangs a wooden crucifix carved by Michelangelo at about 17, made for the friars who let him study anatomy in their hospital. Around the square are bookbinders, gilders and leather workshops.",
+    tip: "Come back in the evening: the square fills with locals having aperitivo on the church steps." },
+  { walk: 2, name: "Palazzo Pitti & Boboli Gardens", area: "Medici palace", lat: 43.76510, lng: 11.25000,
+    why: "Bought by the Medici in 1550, this became the grand-ducal palace, and later home to Napoleon's family and the kings of Italy. The Boboli Gardens behind it, with grottoes, statues and long cypress avenues, became a model for royal gardens across Europe.",
+    tip: "Walk up to the Kaffeehaus terrace in the garden for a quiet view over the rooftops." },
+  { walk: 2, name: "Porta San Niccolò", area: "San Niccolò", lat: 43.76370, lng: 11.26220,
+    why: "A 14th-century gate tower, left standing when most of the city walls were knocked down in the 1860s. The little San Niccolò quarter around it is one of the calmest corners of the centre, with wine bars and trattorias where locals eat.",
+    tip: "From here the Rampe del Poggi, a winding staircase with fountains, climbs to Piazzale Michelangelo." },
+  { walk: 2, name: "Giardino delle Rose", area: "Rose garden", lat: 43.76330, lng: 11.26310,
+    why: "A free terraced garden just below the Piazzale with hundreds of rose varieties and bronze sculptures by Jean-Michel Folon. It has the same view as the square above with a fraction of the crowd.",
+    tip: "Roses peak in May, but the benches and the view are the real reason to stop." },
+  { walk: 2, name: "Piazzale Michelangelo", area: "Panorama", lat: 43.76290, lng: 11.26500,
+    why: "Laid out in 1869, when Florence was briefly the capital of Italy, purely as a viewing terrace. From here you see the whole city in one frame: the dome, Palazzo Vecchio's tower, the bridges and the Tuscan hills beyond.",
+    tip: "Arrive 30 minutes before sunset, find a spot on the steps and watch the city turn pink and gold." },
+  { walk: 2, name: "San Miniato al Monte", area: "Hilltop church", lat: 43.75950, lng: 11.26480,
+    why: "Begun in 1013, this green-and-white marble church is one of the finest Romanesque buildings in Italy, and few visitors climb the extra five minutes to it. Olivetan monks still live here and sing Gregorian chant at vespers. Carlo Collodi, who wrote Pinocchio, is buried in the cemetery.",
+    tip: "If the timing works, sit in for the monks' evening chant (usually late afternoon; check the time on the day)." },
+
+  // Walk 3
+  { walk: 3, name: "Santa Maria Novella", area: "Dominican basilica", lat: 43.77460, lng: 11.24930,
+    why: "Inside is Masaccio's Holy Trinity (about 1427), one of the first paintings to use true mathematical perspective. It must have looked like a hole in the wall to people at the time. Ghirlandaio's frescoes in the main chapel show Florentine society in their best clothes.",
+    tip: "Around the corner on Via della Scala is the friars' pharmacy, making perfumes since the 1200s. It is beautiful inside and free to visit." },
+  { walk: 3, name: "Mercato Centrale", area: "Central market", lat: 43.77640, lng: 11.25330,
+    why: "An iron-and-glass market hall from 1874. Downstairs are traditional butchers, cheese and pasta stalls; upstairs is a big food hall with long shared tables.",
+    tip: "Brave the Florentine classic: a lampredotto sandwich (slow-cooked tripe with green sauce) from the Nerbone stall, open since 1872." },
+  { walk: 3, name: "San Lorenzo & Medici Chapels", area: "The Medici church", lat: 43.77480, lng: 11.25390,
+    why: "The Medici family's parish church. Its rough brick front was meant to get a marble facade by Michelangelo that was never built. Behind it, Michelangelo's New Sacristy holds Medici tombs with his reclining figures of Night, Day, Dawn and Dusk.",
+    tip: "The street stalls around the church sell leather. Check for an 'artigianale' label and feel the weight before you buy." },
+  { walk: 3, name: "Galleria dell'Accademia", area: "Michelangelo's David", lat: 43.77680, lng: 11.25870,
+    why: "The real David: 5.17 m of marble carved between 1501 and 1504 from a block other sculptors had given up on. It was moved indoors in 1873 to protect it. On the way you pass his unfinished Prisoners, figures that look like they are fighting their way out of the stone.",
+    tip: "Book the first slot of the day and you may have David almost to yourselves for a few minutes." },
+  { walk: 3, name: "Mercato di Sant'Ambrogio", area: "The locals' market", lat: 43.76970, lng: 11.26600,
+    why: "Florence's neighbourhood market since 1873: cheaper, smaller and far less touristy than the central one. Outside there are fruit and vegetable stalls; inside are butchers, bakers and cheese counters.",
+    tip: "Have lunch at Da Rocco inside the hall: a cheap, quick trattoria counter that's been popular with locals for decades. Mornings only, closed Sundays." },
+  { walk: 3, name: "Basilica di Santa Croce", area: "Tombs of the greats", lat: 43.76860, lng: 11.26230,
+    why: "The largest Franciscan church in the world, and the burial place of Michelangelo, Galileo, Machiavelli and Rossini, with a memorial to Dante. Giotto painted two of its chapels. The writer Stendhal felt so overwhelmed here in 1817 that the dizzy spell from too much art is now called 'Stendhal syndrome'.",
+    tip: "Look for plaques on nearby walls showing how high the 1966 flood reached. In Santa Croce it was over the height of a person." }
+];
+
+/* ---------- helpers ---------- */
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const walkOf = id => WALKS.find(w => w.id === id);
+const colorOf = p => css(walkOf(p.walk).color);
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function haversine(a, b) {
+  const R = 6371000, toR = d => d * Math.PI / 180;
+  const dLat = toR(b.lat - a.lat), dLng = toR(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+// Streets are not straight lines: stretch the crow-flies distance a little, then walk at ~75 m/min.
+const walkMin = m => Math.max(1, Math.round(m * 1.25 / 75));
+const fmtDist = m => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+function distLabel(p) {
+  if (!me) return "";
+  const d = haversine(me, p);
+  if (d > 15000) return `${fmtDist(d)} away`;
+  return `${walkMin(d)} min walk · ${fmtDist(d)}`;
+}
+const dirUrl = p => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking`;
+
+PLACES.forEach((p, i) => { p.idx = i; p.n = PLACES.filter((q, j) => q.walk === p.walk && j <= i).length; });
+
+/* ---------- map ---------- */
+const map = L.map("map", { zoomControl: false, attributionControl: true }).setView([43.7700, 11.2560], 15);
+L.control.zoom({ position: "topright" }).addTo(map);
+const dark = window.matchMedia("(prefers-color-scheme: dark)");
+const isDark = () => document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && dark.matches);
+const tileUrl = () => `https://{s}.basemaps.cartocdn.com/${isDark() ? "dark_all" : "rastertiles/voyager"}/{z}/{x}/{y}{r}.png`;
+const tiles = L.tileLayer(tileUrl(), {
+  maxZoom: 19, subdomains: "abcd",
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+}).addTo(map);
+
+const markers = [];
+const lines = {};
+function pinIcon(p, state) {
+  return L.divIcon({
+    className: "", iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
+    html: `<div class="pin ${state || ""}" style="background:${colorOf(p)}">${p.n}</div>`
+  });
+}
+function popupHtml(p) {
+  const d = distLabel(p);
+  return `<h4>${esc(p.name)}</h4>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:6px">Walk ${p.walk} · stop ${p.n}${d ? " · <b style='color:var(--me)'>" + d + "</b>" : ""}</p>
+    <p>${esc(p.why)}</p>
+    <a class="btn" href="${dirUrl(p)}" target="_blank" rel="noopener">Walk here ↗</a>`;
+}
+function drawMap() {
+  markers.forEach(m => m.remove()); markers.length = 0;
+  Object.values(lines).forEach(l => l.remove());
+  WALKS.forEach(w => {
+    const pts = PLACES.filter(p => p.walk === w.id).map(p => [p.lat, p.lng]);
+    lines[w.id] = L.polyline(pts, { color: css(w.color), weight: 3, opacity: .75, dashArray: "6 8" }).addTo(map);
+  });
+  PLACES.forEach(p => {
+    const m = L.marker([p.lat, p.lng], { icon: pinIcon(p), title: p.name, riseOnHover: true })
+      .addTo(map).bindPopup(() => popupHtml(p), { maxWidth: 300, autoPanPadding: [56, 56] });
+    m.on("click", () => select(p.idx, false));
+    markers.push(m);
+  });
+  applyFilter(false);
+}
+
+/* ---------- state ---------- */
+let filter = 0;           // 0 = all walks
+let sortNear = false;
+let active = -1;
+let me = null;            // {lat, lng, acc}
+let meMarker = null, meCircle = null, watchId = null, centeredOnce = false;
+
+/* ---------- panel ---------- */
+const $ = id => document.getElementById(id);
+function renderWalkButtons() {
+  const opts = [{ id: 0, name: "All walks" }, ...WALKS];
+  $("walks").innerHTML = opts.map(w => `
+    <button type="button" data-w="${w.id}" aria-pressed="${filter === w.id}">
+      ${w.id ? `<span class="sw" style="background:var(${w.color})"></span>Walk ${w.id}` : w.name}
+    </button>`).join("");
+  $("walks").querySelectorAll("button").forEach(b => b.onclick = () => { filter = +b.dataset.w; renderAll(true); });
+}
+function walkLength(w) {
+  const pts = PLACES.filter(p => p.walk === w.id);
+  let m = 0; for (let i = 1; i < pts.length; i++) m += haversine(pts[i - 1], pts[i]);
+  return m * 1.25;
+}
+function renderIntro() {
+  if (!filter) {
+    $("walkIntro").innerHTML = `<div class="eyebrow">Three walks · ${PLACES.length} stops</div>
+      <h2>Pick a walk, or wander</h2>
+      <p>Walk 1 and Walk 3 stay north of the river. Walk 2 crosses to the south bank and ends on the hill at sunset. With two or three days, do one walk a day.</p>`;
+    return;
+  }
+  const w = walkOf(filter);
+  const km = walkLength(w) / 1000;
+  $("walkIntro").innerHTML = `<div class="eyebrow" style="color:var(${w.color})">Walk ${w.id}</div>
+    <h2>${w.name}</h2><p>${w.blurb}</p>
+    <p class="meta"><b>About ${km.toFixed(1)} km</b> between stops, plus time inside. ${w.when}</p>`;
+}
+function renderList() {
+  let list = PLACES.filter(p => !filter || p.walk === filter);
+  if (sortNear && me) list = [...list].sort((a, b) => haversine(me, a) - haversine(me, b));
+  $("countLbl").textContent = `${list.length} stops`;
+  $("places").innerHTML = list.map(p => {
+    const d = distLabel(p);
+    return `<li class="place ${p.idx === active ? "active" : ""}" data-i="${p.idx}" tabindex="0" id="place-${p.idx}">
+      <span class="num" style="background:var(${walkOf(p.walk).color})">${p.n}</span>
+      <div style="min-width:0">
+        <div class="area">${esc(p.area)}${filter ? "" : ` · Walk ${p.walk}`}</div>
+        <h3>${esc(p.name)}</h3>
+        ${d ? `<div class="dist">${d}</div>` : ""}
+        <p>${esc(p.why)}</p>
+        <div class="more">
+          <div class="tip"><b>For the two of you:</b> ${esc(p.tip)}</div>
+          <div class="acts"><a class="btn" href="${dirUrl(p)}" target="_blank" rel="noopener">Walk here ↗</a></div>
+        </div>
+      </div></li>`;
+  }).join("");
+  $("places").querySelectorAll(".place").forEach(li => {
+    li.onclick = e => { if (e.target.closest("a")) return; select(+li.dataset.i, true); };
+    li.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(+li.dataset.i, true); } };
+  });
+}
+function applyFilter(fit) {
+  PLACES.forEach((p, i) => {
+    const on = !filter || p.walk === filter;
+    markers[i].setIcon(pinIcon(p, (on ? "" : "dim") + (i === active ? " big" : "")));
+    markers[i].setZIndexOffset(on ? 500 : 0);
+  });
+  WALKS.forEach(w => lines[w.id].setStyle({ opacity: !filter || filter === w.id ? .75 : .15 }));
+  if (fit) {
+    const pts = PLACES.filter(p => !filter || p.walk === filter).map(p => [p.lat, p.lng]);
+    map.flyToBounds(pts, { padding: [40, 40], maxZoom: 16, duration: .6 });
+  }
+}
+function select(i, fromList) {
+  active = i;
+  const p = PLACES[i];
+  if (filter && p.walk !== filter) filter = 0;
+  renderAll(false);
+  if (fromList) {
+    map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 16), { duration: .5 });
+    setTimeout(() => markers[i].openPopup(), 550);
+    if (window.matchMedia("(max-width: 860px)").matches) window.scrollTo({ top: 0, behavior: "smooth" });
+  } else {
+    const li = $("place-" + i);
+    if (li && !window.matchMedia("(max-width: 860px)").matches) li.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+function renderAll(fit) {
+  renderWalkButtons(); renderIntro(); renderList(); applyFilter(fit);
+  $("sortWalk").setAttribute("aria-pressed", !sortNear);
+  $("sortNear").setAttribute("aria-pressed", sortNear);
+}
+$("sortWalk").onclick = () => { sortNear = false; renderAll(false); };
+$("sortNear").onclick = () => { if (me) { sortNear = true; renderAll(false); } };
+
+/* ---------- GPS ---------- */
+const FLORENCE = { lat: 43.7700, lng: 11.2560 };
+function setGps(on, title, text, btn) {
+  $("gps").classList.toggle("on", on);
+  $("locateBtn").classList.toggle("on", on);
+  $("gpsTxt").innerHTML = `<b>${title}</b>${text}`;
+  $("gpsBtn").textContent = btn;
+}
+function onPos(pos) {
+  const first = !me;
+  me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+  const ll = [me.lat, me.lng];
+  if (!meMarker) {
+    meCircle = L.circle(ll, { radius: me.acc, color: css("--me"), weight: 1, fillOpacity: .12, interactive: false }).addTo(map);
+    meMarker = L.marker(ll, { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000, title: "You are here" }).addTo(map);
+  } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(me.acc); }
+  $("sortNear").disabled = false; $("sortNear").title = "";
+  const fromCentre = haversine(me, FLORENCE);
+  if (fromCentre > 15000) {
+    setGps(true, "Location on", `You're ${fmtDist(fromCentre)} from Florence. Distances will be useful once you arrive.`, "Recentre");
+  } else {
+    setGps(true, "You're the blue dot", `Accurate to about ${Math.round(me.acc)} m. Walking times are shown on every stop.`, "Recentre");
+    if (!centeredOnce) { map.flyTo(ll, 16, { duration: .6 }); centeredOnce = true; }
+  }
+  if (first) sortNear = fromCentre <= 15000;
+  renderList();
+  $("sortWalk").setAttribute("aria-pressed", !sortNear);
+  $("sortNear").setAttribute("aria-pressed", sortNear);
+}
+function onErr(err) {
+  const msg = err.code === 1
+    ? "Location permission was refused. Allow location for this page in your browser settings, then tap Try again."
+    : err.code === 3 ? "Getting a GPS fix took too long. Step outside or near a window and try again."
+    : "Your position isn't available right now. Check that location services are on.";
+  if (!me) setGps(false, "Can't find you yet", msg, "Try again");
+}
+function startGps() {
+  if (!("geolocation" in navigator)) { setGps(false, "No GPS here", "This browser can't share location.", "Show me"); return; }
+  if (!window.isSecureContext) { setGps(false, "Location needs a secure page", "Open this map from an https:// address (for example GitHub Pages) to use GPS.", "Try again"); return; }
+  if (watchId !== null) {
+    if (me) map.flyTo([me.lat, me.lng], Math.max(map.getZoom(), 16), { duration: .5 });
+    return;
+  }
+  setGps(false, "Finding you…", "Your browser may ask for permission.", "Wait");
+  watchId = navigator.geolocation.watchPosition(onPos, e => { onErr(e); if (e.code === 1) { navigator.geolocation.clearWatch(watchId); watchId = null; } },
+    { enableHighAccuracy: true, maximumAge: 10000, timeout: 25000 });
+}
+$("gpsBtn").onclick = startGps;
+$("locateBtn").onclick = startGps;
+// If permission was already granted on an earlier visit, start straight away.
+try {
+  navigator.permissions?.query({ name: "geolocation" }).then(s => { if (s.state === "granted") startGps(); }).catch(() => {});
+} catch (e) {}
+
+/* ---------- theme ---------- */
+function onTheme() { tiles.setUrl(tileUrl()); drawMap(); if (meCircle) meCircle.setStyle({ color: css("--me") }); }
+dark.addEventListener?.("change", onTheme);
+new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+drawMap();
+renderAll(false);
+</script>
+</body>
+</html>
