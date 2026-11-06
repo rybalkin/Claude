@@ -91,6 +91,15 @@
   .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 700 13px/1 var(--body); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: var(--green); }
   .pin.heard { background: var(--muted); }
   .pin.now { background: var(--rose); transform: scale(1.2); }
+  .mapwrap { position: relative; }
+  .locate { position: absolute; z-index: 500; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 16px; width: 48px; height: 48px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.25); color: var(--muted); }
+  .locate svg { width: 22px; height: 22px; }
+  .locate.on { color: var(--me); }
+  .locate.follow { background: var(--me); color: #fff; border-color: var(--me); }
+  .gpschip { position: absolute; z-index: 500; left: max(12px, env(safe-area-inset-left, 0px)); top: 12px; background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: .85rem; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.2); font-variant-numeric: tabular-nums; }
+  .me-wrap { position: relative; width: 18px; height: 18px; }
+  .me-cone { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin-left: -9px; margin-top: -30px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid color-mix(in srgb, var(--me) 55%, transparent); transform-origin: 50% 30px; }
+  .me-dot { position: absolute; inset: 0; }
   .me-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 30%, transparent); }
   @media (prefers-reduced-motion: no-preference) {
     .me-dot { animation: pulse 2s ease-out infinite; }
@@ -100,7 +109,13 @@
 </head>
 <body>
 
-<div id="map" role="region" aria-label="Map of the walk"></div>
+<div class="mapwrap">
+  <div id="map" role="region" aria-label="Map of the walk"></div>
+  <div class="gpschip" id="gpsChip" hidden>📍 <span id="gpsChipTxt"></span></div>
+  <button class="locate" id="locateBtn" type="button" aria-label="Show my location">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+  </button>
+</div>
 
 <div class="wrap">
   <header>
@@ -302,16 +317,26 @@ audio.addEventListener("ended", () => {
 });
 
 /* ---------- GPS + geofences ---------- */
+let follow = true;
+map.on("dragstart", () => { follow = false; $("locateBtn").classList.remove("follow"); });
 function onPos(pos) {
   me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
   const ll = [me.lat, me.lng];
+  const heading = pos.coords.heading, moving = (pos.coords.speed || 0) > 0.4;
+  const cone = typeof heading === "number" && !isNaN(heading) && moving ? `<div class="me-cone" style="transform:rotate(${heading}deg)"></div>` : "";
+  const icon = L.divIcon({ className: "", html: `<div class="me-wrap">${cone}<div class="me-dot"></div></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
   if (!meMarker) {
     meCircle = L.circle(ll, { radius: me.acc, color: "#1a73e8", weight: 1, fillOpacity: .1, interactive: false }).addTo(map);
-    meMarker = L.marker(ll, { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000 }).addTo(map);
-  } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(me.acc); }
+    meMarker = L.marker(ll, { icon, zIndexOffset: 1000, title: "You are here" }).addTo(map);
+  } else { meMarker.setLatLng(ll).setIcon(icon); meCircle.setLatLng(ll).setRadius(me.acc); }
   if (!centered) { map.setView(ll, 18); centered = true; }
+  else if (follow) map.panTo(ll, { animate: true });
+  $("locateBtn").classList.add("on");
+  $("locateBtn").classList.toggle("follow", follow);
+  $("gpsChip").hidden = false;
+  $("gpsChipTxt").textContent = `You · ±${Math.round(me.acc)} m`;
   $("gpsMsg").textContent = `GPS on · accurate to about ${Math.round(me.acc)} m`;
-  if ($("auto").checked) {
+  if (started && $("auto").checked) {
     STOPS.forEach(s => {
       if (s.manual || triggered.has(s.i)) return;
       if (haversine(me, s) <= s.r + Math.min(me.acc, 20)) {
@@ -324,7 +349,22 @@ function onPos(pos) {
   }
   renderList(); renderNext();
 }
+function startGps() {
+  if (watchId !== null) return;
+  if (!("geolocation" in navigator)) { $("gpsMsg").textContent = "This browser can't share location. Tap ▶ on each stop instead."; return; }
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = "Finding you…";
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+$("locateBtn").onclick = () => {
+  startGps();
+  follow = true; $("locateBtn").classList.add("follow");
+  if (me) map.setView([me.lat, me.lng], Math.max(map.getZoom(), 18));
+};
+// If location was allowed on an earlier visit, show the blue dot straight away.
+try { navigator.permissions?.query({ name: "geolocation" }).then(st => { if (st.state === "granted") startGps(); }).catch(() => {}); } catch (e) {}
 function onErr(e) {
+  if (!me) { $("gpsChip").hidden = false; $("gpsChipTxt").textContent = e.code === 1 ? "Location blocked" : "Looking for GPS…"; }
+  if (e.code === 1) { navigator.geolocation.clearWatch(watchId); watchId = null; }
   $("gpsMsg").textContent = e.code === 1
     ? "Location was refused. Allow it for this site in your browser settings, then reload. You can still tap ▶ on any stop."
     : "Still looking for GPS. Step away from tall walls if you can.";
@@ -339,8 +379,8 @@ $("startBtn").onclick = () => {
   // Play a short silent clip inside the tap so the phone allows the stories to start later on their own.
   audio.src = "audio/silence.mp3";
   audio.play().catch(() => {}).finally(() => {
-    if (!("geolocation" in navigator)) { $("gpsMsg").textContent = "This browser can't share location. Tap ▶ on each stop instead."; return; }
-    watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    startGps();
+    if (me) onPos({ coords: { latitude: me.lat, longitude: me.lng, accuracy: me.acc } });
   });
   keepAwake();
   $("startBtn").textContent = "Walking ✓";
