@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Dante's Quarter</title>
+<meta name="description" content="A GPS audio walk from the Ponte Vecchio through Dante's neighbourhood to Piazza di San Firenze.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  /* Layout: map on top, walk controls and stops below, player docked to the bottom.
+     Marble palette shared with Florence on Foot; the rose accent marks the Oltrarno walk, as on the main map. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --rose: #8a6212;
+    --me: #1a73e8;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+  .mapwrap { position: relative; }
+  #map { height: 42vh; height: 42svh; min-height: 260px; background: var(--chip); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: 18px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2rem; line-height: 1.1; margin: 2px 0 4px; text-wrap: balance; }
+  .lede { margin: 0; color: var(--muted); }
+  .back { color: var(--rose); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+  button.primary { background: var(--rose); border-color: var(--rose); color: #fff; font-size: 1.05rem; padding: 12px 22px; }
+  .badge { display: inline-block; background: var(--rose); color: #fff; border-radius: 6px; padding: 1px 8px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; vertical-align: 2px; }
+
+  .start { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .start p { margin: 0; font-size: .95rem; }
+  .start .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .92rem; color: var(--muted); }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--rose); }
+  .speed { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .speed button { border: 0; border-radius: 0; padding: 5px 12px; background: transparent; font-variant-numeric: tabular-nums; }
+  .speed button[aria-pressed="true"] { background: var(--chip); }
+
+  .next { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 12px; align-items: center; background: var(--chip); border-radius: 14px; padding: 14px; }
+  .next .arrow { width: 44px; height: 44px; border-radius: 50%; background: var(--me); color: #fff; display: grid; place-items: center; font-size: 20px; }
+  .next b { display: block; font-size: 1.05rem; }
+  .next span { color: var(--muted); font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .banner { background: #fff4d6; border: 1px solid #e8cf86; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+  ol.stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .stop { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 12px; align-items: start; }
+  .stop.playing { border-color: var(--rose); box-shadow: 0 0 0 2px color-mix(in srgb, var(--rose) 25%, transparent); }
+  .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--rose); color: #fff; font-weight: 700; font-size: .85rem; }
+  .stop.heard .num { background: var(--muted); }
+  .stop h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .meta .d { color: var(--me); font-weight: 600; }
+  .stop p.look { margin: 6px 0 0; font-size: .93rem; }
+  .vocab:empty { display: none; }
+  .vocab { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .vocab li { background: var(--chip); border-radius: 8px; padding: 3px 9px; font-size: .85rem; }
+  .vocab li i { color: var(--muted); font-style: normal; }
+  .stop details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .stop summary { cursor: pointer; font-weight: 600; color: var(--rose); }
+  .stop details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: 52px minmax(0,1fr); gap: 12px; align-items: center; }
+  .player .pp { width: 52px; height: 52px; padding: 0; display: grid; place-items: center; background: var(--rose); border-color: var(--rose); color: #fff; }
+  .player .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; margin-top: 6px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--rose); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
+
+  .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 700 13px/1 var(--body); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: var(--rose); }
+  .pin.heard { background: var(--muted); }
+  .pin.now { background: var(--ink); transform: scale(1.2); }
+  .locate { position: absolute; z-index: 500; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 16px; width: 48px; height: 48px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.25); color: var(--muted); }
+  .locate svg { width: 22px; height: 22px; }
+  .locate.on { color: var(--me); }
+  .locate.follow { background: var(--me); color: #fff; border-color: var(--me); }
+  .gpschip { position: absolute; z-index: 500; left: max(12px, env(safe-area-inset-left, 0px)); top: 12px; background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: .85rem; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.2); font-variant-numeric: tabular-nums; }
+  .me-wrap { position: relative; width: 18px; height: 18px; }
+  .me-cone { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin-left: -9px; margin-top: -30px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid color-mix(in srgb, var(--me) 55%, transparent); transform-origin: 50% 30px; }
+  .me-dot { position: absolute; inset: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 30%, transparent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .me-dot { animation: pulse 2s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--me) 45%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+  }
+</style>
+</head>
+<body>
+<div class="mapwrap">
+  <div id="map" role="region" aria-label="Map of the walk"></div>
+  <div class="gpschip" id="gpsChip" hidden>📍 <span id="gpsChipTxt"></span></div>
+  <button class="locate" id="locateBtn" type="button" aria-label="Show my location">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+  </button>
+</div>
+
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <a class="back" href="dante-de.html" style="float:right">🇩🇪 Deutsch</a>
+    <div class="eyebrow" style="margin-top:10px">Ponte Vecchio → Piazza di San Firenze · audio walk</div>
+    <h1>Dante's Quarter</h1>
+    <p class="lede">About 800 m from the Ponte Vecchio to the Bargello: a murder over a broken engagement, a lucky bronze boar, chestnuts as ballots, Dante's church with letters to Beatrice, and Leonardo's sketch of a hanged traitor. Giulia and James tell the stories, and each one starts by itself when you arrive.</p>
+  </header>
+
+  <div class="start">
+    <p><b>Before you start:</b> turn the volume up, or share earbuds. Keep this page open with the screen on. Phones pause GPS when the browser is in the background.</p>
+    <div class="row">
+      <button class="primary" id="startBtn" type="button">▶ Start the walk</button>
+      <label class="toggle"><input type="checkbox" id="auto" checked> Play automatically on arrival</label>
+    </div>
+    <div class="row">
+      <span class="toggle">Speed</span>
+      <div class="speed" role="group" aria-label="Speaking speed">
+        <button type="button" data-r="0.8">0.8×</button><button type="button" data-r="0.9">0.9×</button><button type="button" data-r="1">1×</button>
+      </div>
+    </div>
+    <p class="fine" id="gpsMsg">Starting asks for your location.</p>
+  </div>
+
+  <div class="banner" id="banner" hidden><span id="bannerTxt"></span><button type="button" id="bannerBtn">▶ Play</button></div>
+  <div class="next" id="next" hidden><div class="arrow" aria-hidden="true">➜</div><div><b id="nextName"></b><span id="nextDist"></span></div></div>
+
+  <ol class="stops" id="stops"></ol>
+
+  <p class="fine">Voices and sounds: ElevenLabs. The line on the map shows the order of the stops, not every street. Check church opening times on the day. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <button class="pp" id="ppBtn" type="button" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+    <div style="min-width:0">
+      <div class="t" id="pTitle">Tap Start, then walk to stop 1</div>
+      <div class="bar" id="pBar"><i id="pFill"></i></div>
+      <div class="time"><span id="pCur">0:00</span><span id="pDur"></span></div>
+    </div>
+  </div>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const STOPS = [{"slug": "01-ponte-vecchio", "name": "Ponte Vecchio · Torre degli Amidei", "sub": "", "lat": 43.7685, "lng": 11.2533, "r": 35, "look": "North end of the bridge. Look for the old tower with two small lion heads.", "vocab": [], "dur": 82, "text": "Giulia: Ciao, we're back! I'm Giulia...\nJames: ...and I'm James. Today we're walking from the Ponte Vecchio to Piazza di San Firenze. Only about eight hundred metres, but packed with stories. And right in the middle is Dante's neighbourhood.\nGiulia: We're at the north end of the bridge. A few steps up Via Por Santa Maria stands an old stone tower with two little lion heads. That's the tower of the Amidei family.\nJames: And right here, on Easter Sunday 1216, there was a murder that split Florence for almost a hundred years.\nGiulia: A young nobleman called Buondelmonte was engaged to a girl from the Amidei family. Then he broke his word and married someone else.\nJames: For the family, that was an unforgivable insult. So on Easter morning, as Buondelmonte rode across the bridge on a white horse, they killed him, right here at the foot of the bridge.\nGiulia: After that, the whole city split into two parties, the Guelphs and the Ghibellines. Family against family, tower against tower.\nJames: So, a word to lovers: if you make a promise, keep it!\nGiulia: Exactly. Now walk straight up Via Por Santa Maria, to a big open hall with columns: the Mercato Nuovo."}, {"slug": "02-mercato-nuovo", "name": "Mercato Nuovo · Porcellino", "sub": "", "lat": 43.76985, "lng": 11.25405, "r": 30, "look": "The open market loggia with the bronze boar. In the middle of the floor: a round stone like a cartwheel.", "vocab": [], "dur": 82, "text": "James: This is the Mercato Nuovo, the New Market. Well, new... the loggia is almost five hundred years old.\nGiulia: Silk and gold used to be sold here. Today it's mostly leather and souvenirs. But we're here for an animal: il Porcellino!\nJames: The piglet. Actually, it's a bronze wild boar. See how bright and shiny his nose is?\nGiulia: Because everyone rubs it! It brings luck. Then you put a coin in his mouth. If it falls through the grate into the water, one day you'll come back to Florence.\nJames: A very good deal for the city.\nGiulia: Now look at the middle of the loggia, on the floor. There's a round stone with a pattern like a cartwheel.\nJames: That's the pietra dello scandalo, the stone of shame. People who couldn't pay their debts were punished here, in public.\nGiulia: They pulled down the debtor's trousers and slammed him, bare bottom first, onto the stone. Several times. In front of everyone!\nJames: Ouch. I imagine people paid up quickly after that.\nGiulia: From here we head east, across Via dei Calzaiuoli, into the little lanes behind Orsanmichele. We're going to the tiny Piazza San Martino."}, {"slug": "03-castagna", "name": "Torre della Castagna · San Martino", "sub": "", "lat": 43.77125, "lng": 11.256, "r": 28, "look": "A tall, narrow stone tower on a small square. Opposite: the tiny oratory of the Buonomini.", "vocab": [], "dur": 65, "text": "Giulia: We're now in the little Piazza San Martino. This tall, narrow stone tower is the Torre della Castagna, the Chestnut Tower.\nJames: In the thirteenth century, the priors, the city's government, met here. They locked themselves inside the tower so that nobody could threaten or bribe them.\nGiulia: And they voted with chestnuts! Or so the story goes. That's where the name comes from.\nJames: Opposite is a tiny oratory, San Martino dei Buonomini. Since 1441, a brotherhood here has helped poor families who were too ashamed to ask for help.\nGiulia: When the money ran out, the brothers put a little candle by the door. That was the signal: we need donations!\nJames: It gave Italian an idiom: essere ridotti al lumicino. Literally, to be down to the little light. In other words, almost at the end.\nGiulia: And the brotherhood is still working today. A few steps further, Dante's world begins."}, {"slug": "04-dante", "name": "Casa di Dante · Santa Margherita", "sub": "", "lat": 43.7709, "lng": 11.2566, "r": 28, "look": "The house with the tower and flag, and in the lane beside it the little church of Santa Margherita dei Cerchi.", "vocab": [], "dur": 76, "text": "James: Here, in these narrow lanes, Dante Alighieri, Italy's greatest poet, was born in 1265.\nGiulia: The house with the tower and the flag is called Casa di Dante. To be honest, it was only built in the early twentieth century, roughly where the Alighieri family houses once stood. Today it's a museum.\nJames: Much more romantic is the tiny church right beside it, in the lane: Santa Margherita dei Cerchi. People call it Dante's church.\nGiulia: Tradition says this is where Dante saw Beatrice. He loved her all his life, and wrote about her for the rest of it.\nJames: But he married someone else, Gemma Donati. And that's said to have happened in this church too.\nGiulia: Beatrice's family is said to be buried here. Next to the tomb there's a basket of letters. Lovers from all over the world write to her and ask for luck in love.\nJames: If you like, write her a little note yourselves.\nGiulia: She reads every language! And look down at the paving outside: somewhere nearby, Dante's profile is set into the stone. Who finds it first?"}, {"slug": "05-badia", "name": "Badia Fiorentina", "sub": "", "lat": 43.7705, "lng": 11.25775, "r": 25, "look": "The slender, pointed bell tower on Via del Proconsolo. The Bargello stands opposite.", "vocab": [], "dur": 58, "text": "Giulia: Now you're on Via del Proconsolo. The slender, pointed bell tower belongs to the Badia Fiorentina, the oldest abbey in the city. It was founded back in 978.\nJames: Dante knew this bell well. In the Divine Comedy he describes old Florence living by its chimes: peaceful, modest and honest.\nGiulia: The bell called people to work, and told them when the day was done.\nJames: If the church is open, look inside. There's a beautiful painting by Filippino Lippi, the son of the monk and the nun from the love story in the Uffizi.\nGiulia: It shows the Virgin appearing to Saint Bernard while he writes. Very gentle and quiet.\nJames: And sometimes you'll hear the monks and nuns of the community that still lives here, singing.\nGiulia: And right opposite? A building like a fortress. That's the Bargello."}, {"slug": "06-bargello", "name": "Bargello", "sub": "", "lat": 43.7704, "lng": 11.2584, "r": 28, "look": "The fortress with the battlemented tower. Inside: Donatello's David and the panels from the 1401 competition.", "vocab": [], "dur": 79, "text": "Giulia: The Bargello is the oldest public building in Florence. Work began in 1255, even before the Palazzo Vecchio.\nJames: First it was the seat of the Podestà, the city's chief magistrate. Later it was the headquarters of the police chief, the Bargello. And a prison.\nGiulia: People were executed in the courtyard. After the Pazzi conspiracy against the Medici, traitors were hanged from these windows. The young Leonardo da Vinci made a drawing of one of them.\nJames: Today the Bargello is a wonderful sculpture museum, and often much calmer than the Uffizi.\nGiulia: Inside is Donatello's bronze David: a young, almost dancing David in a hat. The first free-standing nude figure since antiquity.\nJames: And here are the two bronze panels from the famous competition of 1401: Brunelleschi against Ghiberti, for a set of doors for the Baptistery.\nGiulia: Ghiberti won. And Brunelleschi was so offended that he went to Rome to study the ancient buildings...\nJames: ...and came back to build the dome of the cathedral.\nGiulia: Sometimes losing isn't so bad. If you have time, go in. The courtyard with its great staircase is worth it on its own."}, {"slug": "07-san-firenze", "name": "Piazza di San Firenze", "sub": "", "lat": 43.7696, "lng": 11.258, "r": 35, "look": "The square with the great Baroque facade. On the corner: Palazzo Gondi with its smooth, rounded stones.", "vocab": [], "dur": 72, "text": "James: And here we are: Piazza di San Firenze.\nGiulia: The great Baroque facade belongs to the San Firenze complex. For a long time this was the city's law court. And today? A museum for Franco Zeffirelli, the famous film director from Florence.\nJames: In 1968 Zeffirelli made Romeo and Juliet, one of the most beautiful love stories ever filmed. What a fitting place to end, for the two of you!\nGiulia: Now look at the elegant palace on the corner, with the smooth, rounded stones. That's Palazzo Gondi, from around 1490.\nJames: Historians say Leonardo's father's house stood on this spot before it. So Leonardo very likely came and went through here.\nGiulia: One last tip: just a few minutes east, on Via Isola delle Stinche, is Vivoli, one of the oldest gelato shops in Florence.\nJames: Giulia, gelato again?\nGiulia: Of course! Grazie mille, you two. It was lovely walking with you.\nJames: Ciao, and enjoy Florence!"}];
+const ROUTE = [[43.76835, 11.2532], [43.7685, 11.2533], [43.76985, 11.25405], [43.7702, 11.2545], [43.7706, 11.2554], [43.771, 11.2558], [43.77125, 11.256], [43.7709, 11.2566], [43.7706, 11.2574], [43.7705, 11.25775], [43.7704, 11.2584], [43.7696, 11.258]];
+STOPS.forEach((s, i) => { s.i = i; s.src = `audio/dante-en/${s.slug}.mp3`; });
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+const audio = $("audio");
+let heard = new Set(store.get("dan-en-heard", [])), triggered = new Set(heard), queue = [], current = -1;
+let me = null, watchId = null, started = false, wakeLock = null, centered = false, follow = true;
+let rate = store.get("dan-rate", 1);
+
+const haversine = (a, b) => { const R = 6371000, t = d => d * Math.PI / 180, dLat = t(b.lat - a.lat), dLng = t(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(t(a.lat)) * Math.cos(t(b.lat)) * Math.sin(dLng / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const fmtDist = m => m < 1000 ? `${Math.round(m / 5) * 5} m` : `${(m / 1000).toFixed(1)} km`;
+const mins = m => Math.max(1, Math.round(m * 1.25 / 75));
+const fmtTime = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* Karte */
+const map = L.map("map", { zoomControl: false }).fitBounds(ROUTE, { padding: [30, 30] });
+L.control.zoom({ position: "topright" }).addTo(map);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+L.polyline(ROUTE, { color: "#8a6212", weight: 5, opacity: .55 }).addTo(map);
+const pins = STOPS.map(s => L.marker([s.lat, s.lng], { title: s.name }).addTo(map).on("click", () => playStop(s.i, true)));
+let meMarker = null, meCircle = null, toNext = null;
+function refreshPins() { STOPS.forEach((s, i) => pins[i].setIcon(L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 14], html: `<div class="pin ${i === current ? "now" : heard.has(i) ? "heard" : ""}">${i + 1}</div>` }))); }
+map.on("dragstart", () => { follow = false; $("locateBtn").classList.remove("follow"); });
+
+/* Liste */
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+function renderList() {
+  $("stops").innerHTML = STOPS.map(s => {
+    const d = me ? `<span class="d">${fmtDist(haversine(me, s))}</span> · ` : "";
+    const now = s.i === current && !audio.paused;
+    return `<li class="stop ${s.i === current ? "playing" : ""} ${heard.has(s.i) ? "heard" : ""}" id="stop-${s.i}">
+      <span class="num">${s.i + 1}</span>
+      <div style="min-width:0">
+        <h3>${esc(s.name)}${s.sub ? ` <span class="meta">· ${esc(s.sub)}</span>` : ""}</h3>
+        <div class="meta">${d}${fmtTime(s.dur)} · ${heard.has(s.i) ? "✓ heard" : "plays on arrival"}</div>
+        <p class="look">${esc(s.look)}</p>
+        <ul class="vocab" aria-label="Vocabulary">${s.vocab.map(([de, en]) => `<li><b>${esc(de)}</b> <i>${esc(en)}</i></li>`).join("")}</ul>
+        <details><summary>Read along</summary><p>${esc(s.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${s.i}" aria-label="${now ? "Pause" : "Play"}: ${esc(s.name)}">${now ? pauseSvg : playSvg}</button></li>`;
+  }).join("");
+  $("stops").querySelectorAll(".play").forEach(b => b.onclick = () => { const i = +b.dataset.i; if (i === current && !audio.paused) audio.pause(); else playStop(i, true); });
+}
+function nextStop() { const reached = Math.max(-1, current, ...triggered); return STOPS.find(s => s.i > reached && !triggered.has(s.i)) || null; }
+function renderNext() {
+  const n = nextStop();
+  if (!started) { $("next").hidden = true; return; }
+  $("next").hidden = false;
+  if (!n) { $("nextName").textContent = "You've heard every stop"; $("nextDist").textContent = "Enjoy the evening!"; if (toNext) { toNext.remove(); toNext = null; } return; }
+  $("nextName").textContent = `Next: ${n.i + 1}. ${n.name}`;
+  if (me) {
+    const d = haversine(me, n); $("nextDist").textContent = `${fmtDist(d)} · about ${mins(d)} min walk`;
+    const ll = [[me.lat, me.lng], [n.lat, n.lng]];
+    if (!toNext) toNext = L.polyline(ll, { color: "#1a73e8", weight: 3, dashArray: "4 8", opacity: .8 }).addTo(map); else toNext.setLatLngs(ll);
+  } else $("nextDist").textContent = "Waiting for GPS…";
+}
+
+/* Audio */
+function setPlayerUi() {
+  const s = STOPS[current];
+  $("pTitle").textContent = s ? `${s.i + 1}. ${s.name}` : (started ? "Walk on to the next stop" : "Tap Start, then walk to stop 1");
+  $("ppIcon").innerHTML = audio.paused || !s ? '<path d="M7 4.5v15l13-7.5z"/>' : '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+  $("ppBtn").setAttribute("aria-label", audio.paused ? "Play" : "Pause");
+}
+function playStop(i, user) {
+  const s = STOPS[i];
+  queue = queue.filter(q => q !== i); triggered.add(i); current = i;
+  audio.src = s.src; audio.playbackRate = rate;
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: "Giulia & James", album: "Dante's Quarter" });
+  audio.play().then(() => { $("banner").hidden = true; }).catch(() => { $("bannerTxt").textContent = `You've reached ${s.name}.`; $("banner").hidden = false; });
+  if (user) map.panTo([s.lat, s.lng]);
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+}
+$("bannerBtn").onclick = () => { audio.play().catch(() => {}); $("banner").hidden = true; };
+$("ppBtn").onclick = () => { if (current < 0) { const n = nextStop() || STOPS[0]; playStop(n.i, true); return; } if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+audio.addEventListener("play", () => { audio.playbackRate = rate; setPlayerUi(); renderList(); });
+audio.addEventListener("pause", () => { setPlayerUi(); renderList(); });
+audio.addEventListener("timeupdate", () => { if (!audio.duration || current < 0) return; $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`; $("pCur").textContent = fmtTime(audio.currentTime); $("pDur").textContent = fmtTime(audio.duration); });
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  if (current >= 0) { heard.add(current); store.set("dan-en-heard", [...heard]); }
+  current = -1; $("pFill").style.width = "0"; $("pCur").textContent = "0:00"; $("pDur").textContent = "";
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+  if (queue.length) playStop(queue.shift(), false);
+});
+function renderSpeed() { document.querySelectorAll(".speed button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.r === rate)); }
+document.querySelectorAll(".speed button").forEach(b => b.onclick = () => { rate = +b.dataset.r; store.set("dan-rate", rate); audio.playbackRate = rate; renderSpeed(); });
+
+/* GPS */
+function onPos(pos) {
+  me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+  const ll = [me.lat, me.lng], hd = pos.coords.heading, moving = (pos.coords.speed || 0) > 0.4;
+  const cone = typeof hd === "number" && !isNaN(hd) && moving ? `<div class="me-cone" style="transform:rotate(${hd}deg)"></div>` : "";
+  const icon = L.divIcon({ className: "", html: `<div class="me-wrap">${cone}<div class="me-dot"></div></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+  if (!meMarker) {
+    meCircle = L.circle(ll, { radius: me.acc, color: "#1a73e8", weight: 1, fillOpacity: .1, interactive: false }).addTo(map);
+    meMarker = L.marker(ll, { icon, zIndexOffset: 1000, title: "You are here" }).addTo(map);
+  } else { meMarker.setLatLng(ll).setIcon(icon); meCircle.setLatLng(ll).setRadius(me.acc); }
+  if (!centered) { map.setView(ll, 17); centered = true; } else if (follow) map.panTo(ll);
+  $("locateBtn").classList.add("on"); $("locateBtn").classList.toggle("follow", follow);
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = `You · ±${Math.round(me.acc)} m`;
+  $("gpsMsg").textContent = `GPS on · accurate to about ${Math.round(me.acc)} m`;
+  if (started && $("auto").checked) STOPS.forEach(s => {
+    if (triggered.has(s.i)) return;
+    if (haversine(me, s) <= s.r + Math.min(me.acc, 20)) {
+      triggered.add(s.i);
+      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      if (current < 0) playStop(s.i, false); else if (!queue.includes(s.i)) queue.push(s.i);
+    }
+  });
+  renderList(); renderNext();
+}
+function onErr(e) {
+  if (!me) { $("gpsChip").hidden = false; $("gpsChipTxt").textContent = e.code === 1 ? "Location blocked" : "Looking for GPS…"; }
+  $("gpsMsg").textContent = e.code === 1 ? "Location was refused. Allow it for this site in your browser settings, then reload. You can still tap ▶ on any stop." : "Still looking for GPS. Tall walls can get in the way.";
+  if (e.code === 1 && watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+function startGps() {
+  if (watchId !== null) return;
+  if (!("geolocation" in navigator)) { $("gpsMsg").textContent = "This browser can't share location."; return; }
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = "Finding you…";
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+$("locateBtn").onclick = () => { startGps(); follow = true; $("locateBtn").classList.add("follow"); if (me) map.setView([me.lat, me.lng], Math.max(map.getZoom(), 17)); };
+try { navigator.permissions?.query({ name: "geolocation" }).then(st => { if (st.state === "granted") startGps(); }).catch(() => {}); } catch (e) {}
+async function keepAwake() { try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (started && document.visibilityState === "visible") keepAwake(); });
+
+$("startBtn").onclick = () => {
+  started = true;
+  audio.src = "audio/silence.mp3";   // Kurzer stummer Ton im Tipp, damit das Handy später automatisch abspielen darf.
+  audio.play().catch(() => {}).finally(() => { startGps(); if (me) onPos({ coords: { latitude: me.lat, longitude: me.lng, accuracy: me.acc } }); });
+  keepAwake();
+  $("startBtn").textContent = "Walking ✓"; $("startBtn").disabled = true;
+  setPlayerUi(); renderNext();
+};
+$("resetBtn").onclick = () => { heard = new Set(); triggered = new Set(); queue = []; store.set("dan-en-heard", []); refreshPins(); renderList(); renderNext(); };
+renderSpeed(); refreshPins(); renderList(); setPlayerUi();
+</script>
+</body>
+</html>

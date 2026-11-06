@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Dantes Viertel</title>
+<meta name="description" content="GPS-Audiotour auf Deutsch (B2) von der Ponte Vecchio durch Dantes Viertel bis zur Piazza di San Firenze.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  /* Layout: map on top, walk controls and stops below, player docked to the bottom.
+     Marble palette shared with Florence on Foot; the rose accent marks the Oltrarno walk, as on the main map. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --rose: #8a6212;
+    --me: #1a73e8;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+  .mapwrap { position: relative; }
+  #map { height: 42vh; height: 42svh; min-height: 260px; background: var(--chip); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: 18px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2rem; line-height: 1.1; margin: 2px 0 4px; text-wrap: balance; }
+  .lede { margin: 0; color: var(--muted); }
+  .back { color: var(--rose); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+  button.primary { background: var(--rose); border-color: var(--rose); color: #fff; font-size: 1.05rem; padding: 12px 22px; }
+  .badge { display: inline-block; background: var(--rose); color: #fff; border-radius: 6px; padding: 1px 8px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; vertical-align: 2px; }
+
+  .start { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .start p { margin: 0; font-size: .95rem; }
+  .start .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .92rem; color: var(--muted); }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--rose); }
+  .speed { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .speed button { border: 0; border-radius: 0; padding: 5px 12px; background: transparent; font-variant-numeric: tabular-nums; }
+  .speed button[aria-pressed="true"] { background: var(--chip); }
+
+  .next { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 12px; align-items: center; background: var(--chip); border-radius: 14px; padding: 14px; }
+  .next .arrow { width: 44px; height: 44px; border-radius: 50%; background: var(--me); color: #fff; display: grid; place-items: center; font-size: 20px; }
+  .next b { display: block; font-size: 1.05rem; }
+  .next span { color: var(--muted); font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .banner { background: #fff4d6; border: 1px solid #e8cf86; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+  ol.stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .stop { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 12px; align-items: start; }
+  .stop.playing { border-color: var(--rose); box-shadow: 0 0 0 2px color-mix(in srgb, var(--rose) 25%, transparent); }
+  .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--rose); color: #fff; font-weight: 700; font-size: .85rem; }
+  .stop.heard .num { background: var(--muted); }
+  .stop h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .meta .d { color: var(--me); font-weight: 600; }
+  .stop p.look { margin: 6px 0 0; font-size: .93rem; }
+  .vocab:empty { display: none; }
+  .vocab { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .vocab li { background: var(--chip); border-radius: 8px; padding: 3px 9px; font-size: .85rem; }
+  .vocab li i { color: var(--muted); font-style: normal; }
+  .stop details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .stop summary { cursor: pointer; font-weight: 600; color: var(--rose); }
+  .stop details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: 52px minmax(0,1fr); gap: 12px; align-items: center; }
+  .player .pp { width: 52px; height: 52px; padding: 0; display: grid; place-items: center; background: var(--rose); border-color: var(--rose); color: #fff; }
+  .player .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; margin-top: 6px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--rose); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
+
+  .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 700 13px/1 var(--body); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: var(--rose); }
+  .pin.heard { background: var(--muted); }
+  .pin.now { background: var(--ink); transform: scale(1.2); }
+  .locate { position: absolute; z-index: 500; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 16px; width: 48px; height: 48px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.25); color: var(--muted); }
+  .locate svg { width: 22px; height: 22px; }
+  .locate.on { color: var(--me); }
+  .locate.follow { background: var(--me); color: #fff; border-color: var(--me); }
+  .gpschip { position: absolute; z-index: 500; left: max(12px, env(safe-area-inset-left, 0px)); top: 12px; background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: .85rem; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.2); font-variant-numeric: tabular-nums; }
+  .me-wrap { position: relative; width: 18px; height: 18px; }
+  .me-cone { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin-left: -9px; margin-top: -30px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid color-mix(in srgb, var(--me) 55%, transparent); transform-origin: 50% 30px; }
+  .me-dot { position: absolute; inset: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 30%, transparent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .me-dot { animation: pulse 2s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--me) 45%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+  }
+</style>
+</head>
+<body>
+<div class="mapwrap">
+  <div id="map" role="region" aria-label="Karte des Spaziergangs"></div>
+  <div class="gpschip" id="gpsChip" hidden>📍 <span id="gpsChipTxt"></span></div>
+  <button class="locate" id="locateBtn" type="button" aria-label="Meinen Standort zeigen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+  </button>
+</div>
+
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <a class="back" href="dante-en.html" style="float:right">🇬🇧 English</a>
+    <div class="eyebrow" style="margin-top:10px">Ponte Vecchio → Piazza di San Firenze · Audiotour <span class="badge">Deutsch B2</span></div>
+    <h1>Dantes Viertel</h1>
+    <p class="lede">Etwa 800 m von der Ponte Vecchio bis zum Bargello: ein Mord aus Liebe, ein Glücksschwein, Kastanien als Stimmzettel, Dantes Kirche mit Briefen an Beatrice und Leonardos Skizze eines Verräters. Giulia und Lukas erzählen, und jede Geschichte startet automatisch, wenn ihr ankommt.</p>
+  </header>
+
+  <div class="start">
+    <p><b>Vor dem Start:</b> Lautstärke hoch, oder teilt euch die Kopfhörer. Lasst diese Seite offen und den Bildschirm an. Im Hintergrund pausiert das Handy das GPS.</p>
+    <div class="row">
+      <button class="primary" id="startBtn" type="button">▶ Spaziergang starten</button>
+      <label class="toggle"><input type="checkbox" id="auto" checked> Bei Ankunft automatisch abspielen</label>
+    </div>
+    <div class="row">
+      <span class="toggle">Tempo</span>
+      <div class="speed" role="group" aria-label="Sprechtempo">
+        <button type="button" data-r="0.8">0,8×</button><button type="button" data-r="0.9">0,9×</button><button type="button" data-r="1">1×</button>
+      </div>
+    </div>
+    <p class="fine" id="gpsMsg">Beim Start fragt das Handy nach eurem Standort.</p>
+  </div>
+
+  <div class="banner" id="banner" hidden><span id="bannerTxt"></span><button type="button" id="bannerBtn">▶ Abspielen</button></div>
+  <div class="next" id="next" hidden><div class="arrow" aria-hidden="true">➜</div><div><b id="nextName"></b><span id="nextDist"></span></div></div>
+
+  <ol class="stops" id="stops"></ol>
+
+  <p class="fine">Stimmen und Geräusche: ElevenLabs. Die Linie auf der Karte zeigt die Reihenfolge, nicht jede Straße genau. Öffnungszeiten der Kirchen bitte vor Ort prüfen. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Fortschritt zurücksetzen</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <button class="pp" id="ppBtn" type="button" aria-label="Abspielen"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+    <div style="min-width:0">
+      <div class="t" id="pTitle">Starten, dann zu Station 1 gehen</div>
+      <div class="bar" id="pBar"><i id="pFill"></i></div>
+      <div class="time"><span id="pCur">0:00</span><span id="pDur"></span></div>
+    </div>
+  </div>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const STOPS = [{"slug": "01-ponte-vecchio", "name": "Ponte Vecchio · Torre degli Amidei", "sub": "", "lat": 43.7685, "lng": 11.2533, "r": 35, "look": "Nördliches Ende der Brücke. Sucht den alten Turm mit zwei kleinen Löwenköpfen.", "vocab": [["verlobt", "engaged"], ["sein Wort brechen", "to break one's word"], ["die Beleidigung", "insult"], ["ermorden", "to murder"], ["spalten", "to split"]], "dur": 85, "text": "Giulia: Ciao, da sind wir wieder! Ich bin Giulia...\nLukas: ...und ich bin Lukas. Heute gehen wir von der Ponte Vecchio bis zur Piazza di San Firenze. Nur etwa achthundert Meter, aber voller Geschichten. Und mittendrin liegt das Viertel von Dante.\nGiulia: Wir stehen am nördlichen Ende der Brücke. Ein paar Schritte weiter, an der Via Por Santa Maria, steht ein alter Turm mit zwei kleinen Löwenköpfen. Das ist der Turm der Familie Amidei.\nLukas: Und genau hier, am Ostersonntag 1216, passierte ein Mord, der Florenz für fast hundert Jahre gespalten hat.\nGiulia: Ein junger Adliger, Buondelmonte, war mit einem Mädchen aus der Familie Amidei verlobt. Aber dann hat er sein Wort gebrochen und eine andere geheiratet.\nLukas: Für die Familie war das eine furchtbare Beleidigung. Als Buondelmonte am Ostermorgen auf einem weißen Pferd über die Brücke ritt, haben sie ihn hier, am Fuß der Brücke, ermordet.\nGiulia: Danach teilte sich die ganze Stadt in zwei Parteien: Guelfen und Ghibellinen. Familie gegen Familie, Turm gegen Turm.\nLukas: Also, liebe Verliebte: Wenn ihr etwas versprecht, haltet euer Wort!\nGiulia: Genau. Geht jetzt geradeaus die Via Por Santa Maria hinauf, bis zu einer großen offenen Halle mit Säulen: dem Mercato Nuovo."}, {"slug": "02-mercato-nuovo", "name": "Mercato Nuovo · Porcellino", "sub": "", "lat": 43.76985, "lng": 11.25405, "r": 30, "look": "Die offene Markthalle mit dem Bronze-Wildschwein. In der Mitte am Boden: ein runder Stein wie ein Wagenrad.", "vocab": [["das Wildschwein", "wild boar"], ["reiben", "to rub"], ["das Gitter", "grate, grille"], ["die Schulden", "debts"], ["die Schande", "shame, disgrace"]], "dur": 85, "text": "Lukas: Das ist der Mercato Nuovo, der neue Markt. Na ja, neu... Die Halle ist fast fünfhundert Jahre alt.\nGiulia: Früher wurden hier Seide und Gold verkauft, heute vor allem Lederwaren und Souvenirs. Aber wir sind wegen eines Tieres hier: il Porcellino!\nLukas: Das Schweinchen. Eigentlich ist es ein Wildschwein aus Bronze. Seht ihr, wie hell und glänzend seine Nase ist?\nGiulia: Weil alle sie reiben! Das bringt Glück. Dann legt ihr eine Münze in sein Maul. Wenn sie durch das Gitter ins Wasser fällt, kommt ihr eines Tages nach Florenz zurück.\nLukas: Ein sehr gutes Geschäft für die Stadt.\nGiulia: Und jetzt schaut in die Mitte der Halle, auf den Boden. Dort liegt ein runder Stein mit einem Muster wie ein Wagenrad.\nLukas: Das ist die pietra dello scandalo, der Stein der Schande. Wer seine Schulden nicht bezahlen konnte, wurde hier öffentlich bestraft.\nGiulia: Man zog dem Schuldner die Hose herunter und setzte ihn mehrmals hart mit dem nackten Hintern auf den Stein. Vor allen Leuten!\nLukas: Autsch. Danach hat man bestimmt schneller bezahlt.\nGiulia: Von hier gehen wir nach Osten, über die Via dei Calzaiuoli, in die kleinen Gassen hinter der Kirche Orsanmichele. Unser Ziel ist die kleine Piazza San Martino."}, {"slug": "03-castagna", "name": "Torre della Castagna · San Martino", "sub": "", "lat": 43.77125, "lng": 11.256, "r": 28, "look": "Ein hoher, schmaler Steinturm an einem kleinen Platz. Gegenüber: das winzige Oratorium der Buonomini.", "vocab": [["bestechen", "to bribe"], ["abstimmen", "to vote"], ["die Kastanie", "chestnut"], ["die Spende", "donation"], ["die Redewendung", "idiom"]], "dur": 68, "text": "Giulia: Wir sind jetzt auf der kleinen Piazza San Martino. Der hohe, schmale Steinturm hier heißt Torre della Castagna, der Kastanienturm.\nLukas: Im dreizehnten Jahrhundert trafen sich hier die Prioren, die Regierung der Stadt. Sie haben sich im Turm eingeschlossen, damit niemand sie bedrohen oder bestechen konnte.\nGiulia: Und abgestimmt haben sie mit Kastanien! So erzählt man es jedenfalls. Daher kommt der Name.\nLukas: Gegenüber steht ein winziges Oratorium: San Martino dei Buonomini. Seit 1441 hilft hier eine Bruderschaft armen Familien, die sich schämten, um Hilfe zu bitten.\nGiulia: Wenn das Geld ausging, stellten die Brüder eine kleine Kerze an die Tür. Das war das Zeichen: Wir brauchen Spenden!\nLukas: Daraus entstand eine italienische Redewendung: essere ridotti al lumicino. Wörtlich: nur noch ein kleines Licht haben. Also: fast am Ende sein.\nGiulia: Und diese Bruderschaft gibt es bis heute. Nur ein paar Schritte weiter beginnt Dantes Welt."}, {"slug": "04-dante", "name": "Casa di Dante · Santa Margherita", "sub": "", "lat": 43.7709, "lng": 11.2566, "r": 28, "look": "Das Haus mit Turm und Fahne, und daneben in der Gasse die kleine Kirche Santa Margherita dei Cerchi.", "vocab": [["der Dichter", "poet"], ["begraben", "buried"], ["der Korb", "basket"], ["das Pflaster", "paving"], ["eingelassen", "set into"]], "dur": 80, "text": "Lukas: Hier, in diesen engen Gassen, wurde 1265 Dante Alighieri geboren, der größte Dichter Italiens.\nGiulia: Das Haus mit dem Turm und der Fahne heißt Casa di Dante. Ehrlich gesagt wurde es erst Anfang des zwanzigsten Jahrhunderts gebaut, ungefähr dort, wo die Häuser der Familie Alighieri standen. Heute ist es ein Museum.\nLukas: Viel romantischer ist die kleine Kirche gleich nebenan, in der Gasse: Santa Margherita dei Cerchi. Man nennt sie auch die Kirche Dantes.\nGiulia: Die Tradition sagt, dass Dante hier Beatrice gesehen hat. Er hat sie sein ganzes Leben lang geliebt und über sie geschrieben.\nLukas: Aber geheiratet hat er eine andere: Gemma Donati. Und auch das soll in dieser Kirche gewesen sein.\nGiulia: Hier soll auch die Familie von Beatrice begraben sein. Neben ihrem Grab steht ein Korb mit Briefen. Verliebte aus der ganzen Welt schreiben ihr und bitten um Glück in der Liebe.\nLukas: Wenn ihr wollt, schreibt auch einen kleinen Brief. Beatrice versteht bestimmt auch Deutsch.\nGiulia: Ganz sicher! Und schaut draußen auf das Pflaster: Irgendwo in der Nähe ist Dantes Profil in den Stein eingelassen. Wer findet es zuerst?"}, {"slug": "05-badia", "name": "Badia Fiorentina", "sub": "", "lat": 43.7705, "lng": 11.25775, "r": 25, "look": "Der schlanke, spitze Glockenturm an der Via del Proconsolo. Gegenüber steht der Bargello.", "vocab": [["die Abtei", "abbey"], ["der Glockenturm", "bell tower"], ["läuten", "to ring"], ["bescheiden", "modest"], ["erscheinen", "to appear"]], "dur": 63, "text": "Giulia: Jetzt kommt ihr auf die Via del Proconsolo. Der schlanke, spitze Glockenturm gehört zur Badia Fiorentina, der ältesten Abtei der Stadt. Sie wurde schon im Jahr 978 gegründet.\nLukas: Dante kannte diese Glocke sehr gut. In der Göttlichen Komödie beschreibt er das alte Florenz, das nach ihrem Läuten lebte: friedlich, bescheiden und ehrlich.\nGiulia: Die Glocke rief die Menschen zur Arbeit, und sie sagte ihnen, wann der Tag zu Ende war.\nLukas: Wenn die Kirche offen ist, schaut hinein. Dort hängt ein wunderschönes Bild von Filippino Lippi. Er war der Sohn des Mönchs und der Nonne aus der Liebesgeschichte in den Uffizien.\nGiulia: Das Bild zeigt, wie Maria dem heiligen Bernhard erscheint, während er schreibt. Ganz zart und ruhig.\nLukas: Und manchmal singen hier Mönche und Nonnen einer Gemeinschaft, die bis heute in der Abtei lebt.\nGiulia: Und direkt gegenüber? Ein Gebäude wie eine Festung. Das ist der Bargello."}, {"slug": "06-bargello", "name": "Bargello", "sub": "", "lat": 43.7704, "lng": 11.2584, "r": 28, "look": "Die Festung mit dem Zinnenturm. Innen: Donatellos David und die Tafeln des Wettbewerbs von 1401.", "vocab": [["die Festung", "fortress"], ["hinrichten", "to execute"], ["die Verschwörung", "conspiracy"], ["der Wettbewerb", "competition"], ["beleidigt", "offended"]], "dur": 82, "text": "Giulia: Der Bargello ist das älteste öffentliche Gebäude von Florenz. Man hat ihn ab 1255 gebaut, noch vor dem Palazzo Vecchio.\nLukas: Zuerst saß hier der Podestà, der oberste Richter der Stadt. Später war es das Hauptquartier des Polizeichefs, des Bargello. Und ein Gefängnis.\nGiulia: Im Innenhof wurden Menschen hingerichtet. Nach der Verschwörung der Pazzi gegen die Medici hängte man Verräter aus diesen Fenstern. Der junge Leonardo da Vinci hat einen von ihnen gezeichnet.\nLukas: Heute ist der Bargello ein wunderbares Museum für Skulpturen, und oft viel ruhiger als die Uffizien.\nGiulia: Hier steht der Bronze-David von Donatello: ein junger, fast tanzender David mit einem Hut. Er war die erste frei stehende Aktfigur seit der Antike.\nLukas: Und hier liegen die zwei Bronzetafeln vom berühmten Wettbewerb 1401: Brunelleschi gegen Ghiberti, für eine Tür des Baptisteriums.\nGiulia: Ghiberti hat gewonnen. Und Brunelleschi war so beleidigt, dass er nach Rom ging und die antiken Bauten studierte...\nLukas: ...und später die Kuppel des Doms gebaut hat.\nGiulia: Manchmal ist Verlieren gar nicht so schlecht. Wenn ihr Zeit habt, geht hinein. Schon der Innenhof mit der großen Treppe lohnt sich."}, {"slug": "07-san-firenze", "name": "Piazza di San Firenze", "sub": "", "lat": 43.7696, "lng": 11.258, "r": 35, "look": "Der Platz mit der großen Barockfassade. An der Ecke: der Palazzo Gondi mit seinen runden, glatten Steinen.", "vocab": [["das Gericht", "court of law"], ["der Regisseur", "film director"], ["einen Film drehen", "to shoot a film"], ["passend", "fitting"], ["die Eisdiele", "ice-cream parlour"]], "dur": 75, "text": "Lukas: Und wir sind am Ziel: die Piazza di San Firenze.\nGiulia: Die große Barockfassade gehört zum Komplex von San Firenze. Lange war hier das Gericht der Stadt. Und heute? Ein Museum für Franco Zeffirelli, den berühmten Regisseur aus Florenz.\nLukas: Zeffirelli hat 1968 Romeo und Julia gedreht, einen der schönsten Liebesfilme aller Zeiten. Was für ein passendes Ende für euch zwei!\nGiulia: Und jetzt schaut auf den eleganten Palast an der Ecke, mit den glatten, runden Steinen. Das ist der Palazzo Gondi, aus den Jahren um 1490.\nLukas: Historiker sagen, dass an dieser Stelle vorher das Haus von Leonardos Vater stand. Hier ist Leonardo also wahrscheinlich ein und aus gegangen.\nGiulia: Ein letzter Tipp: Nur ein paar Minuten östlich, in der Via Isola delle Stinche, liegt Vivoli, eine der ältesten Eisdielen von Florenz.\nLukas: Giulia, schon wieder Eis?\nGiulia: Natürlich! Grazie mille, ihr zwei. Es war schön, mit euch zu gehen.\nLukas: Ciao, und genießt Florenz!"}];
+const ROUTE = [[43.76835, 11.2532], [43.7685, 11.2533], [43.76985, 11.25405], [43.7702, 11.2545], [43.7706, 11.2554], [43.771, 11.2558], [43.77125, 11.256], [43.7709, 11.2566], [43.7706, 11.2574], [43.7705, 11.25775], [43.7704, 11.2584], [43.7696, 11.258]];
+STOPS.forEach((s, i) => { s.i = i; s.src = `audio/dante-de/${s.slug}.mp3`; });
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+const audio = $("audio");
+let heard = new Set(store.get("dan-de-heard", [])), triggered = new Set(heard), queue = [], current = -1;
+let me = null, watchId = null, started = false, wakeLock = null, centered = false, follow = true;
+let rate = store.get("dan-rate", 1);
+
+const haversine = (a, b) => { const R = 6371000, t = d => d * Math.PI / 180, dLat = t(b.lat - a.lat), dLng = t(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(t(a.lat)) * Math.cos(t(b.lat)) * Math.sin(dLng / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const fmtDist = m => m < 1000 ? `${Math.round(m / 5) * 5} m` : `${(m / 1000).toFixed(1).replace(".", ",")} km`;
+const mins = m => Math.max(1, Math.round(m * 1.25 / 75));
+const fmtTime = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* Karte */
+const map = L.map("map", { zoomControl: false }).fitBounds(ROUTE, { padding: [30, 30] });
+L.control.zoom({ position: "topright" }).addTo(map);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+L.polyline(ROUTE, { color: "#8a6212", weight: 5, opacity: .55 }).addTo(map);
+const pins = STOPS.map(s => L.marker([s.lat, s.lng], { title: s.name }).addTo(map).on("click", () => playStop(s.i, true)));
+let meMarker = null, meCircle = null, toNext = null;
+function refreshPins() { STOPS.forEach((s, i) => pins[i].setIcon(L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 14], html: `<div class="pin ${i === current ? "now" : heard.has(i) ? "heard" : ""}">${i + 1}</div>` }))); }
+map.on("dragstart", () => { follow = false; $("locateBtn").classList.remove("follow"); });
+
+/* Liste */
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+function renderList() {
+  $("stops").innerHTML = STOPS.map(s => {
+    const d = me ? `<span class="d">${fmtDist(haversine(me, s))}</span> · ` : "";
+    const now = s.i === current && !audio.paused;
+    return `<li class="stop ${s.i === current ? "playing" : ""} ${heard.has(s.i) ? "heard" : ""}" id="stop-${s.i}">
+      <span class="num">${s.i + 1}</span>
+      <div style="min-width:0">
+        <h3>${esc(s.name)}${s.sub ? ` <span class="meta">· ${esc(s.sub)}</span>` : ""}</h3>
+        <div class="meta">${d}${fmtTime(s.dur)} · ${heard.has(s.i) ? "✓ gehört" : "startet bei Ankunft"}</div>
+        <p class="look">${esc(s.look)}</p>
+        <ul class="vocab" aria-label="Wortschatz">${s.vocab.map(([de, en]) => `<li><b>${esc(de)}</b> <i>${esc(en)}</i></li>`).join("")}</ul>
+        <details><summary>Mitlesen</summary><p>${esc(s.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${s.i}" aria-label="${now ? "Pause" : "Abspielen"}: ${esc(s.name)}">${now ? pauseSvg : playSvg}</button></li>`;
+  }).join("");
+  $("stops").querySelectorAll(".play").forEach(b => b.onclick = () => { const i = +b.dataset.i; if (i === current && !audio.paused) audio.pause(); else playStop(i, true); });
+}
+function nextStop() { const reached = Math.max(-1, current, ...triggered); return STOPS.find(s => s.i > reached && !triggered.has(s.i)) || null; }
+function renderNext() {
+  const n = nextStop();
+  if (!started) { $("next").hidden = true; return; }
+  $("next").hidden = false;
+  if (!n) { $("nextName").textContent = "Ihr habt alle Stationen gehört"; $("nextDist").textContent = "Genießt den Abend!"; if (toNext) { toNext.remove(); toNext = null; } return; }
+  $("nextName").textContent = `Nächste Station: ${n.i + 1}. ${n.name}`;
+  if (me) {
+    const d = haversine(me, n); $("nextDist").textContent = `${fmtDist(d)} · etwa ${mins(d)} Min. zu Fuß`;
+    const ll = [[me.lat, me.lng], [n.lat, n.lng]];
+    if (!toNext) toNext = L.polyline(ll, { color: "#1a73e8", weight: 3, dashArray: "4 8", opacity: .8 }).addTo(map); else toNext.setLatLngs(ll);
+  } else $("nextDist").textContent = "Warte auf GPS…";
+}
+
+/* Audio */
+function setPlayerUi() {
+  const s = STOPS[current];
+  $("pTitle").textContent = s ? `${s.i + 1}. ${s.name}` : (started ? "Weiter zur nächsten Station" : "Starten, dann zu Station 1 gehen");
+  $("ppIcon").innerHTML = audio.paused || !s ? '<path d="M7 4.5v15l13-7.5z"/>' : '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+  $("ppBtn").setAttribute("aria-label", audio.paused ? "Abspielen" : "Pause");
+}
+function playStop(i, user) {
+  const s = STOPS[i];
+  queue = queue.filter(q => q !== i); triggered.add(i); current = i;
+  audio.src = s.src; audio.playbackRate = rate;
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: "Giulia & Lukas", album: "Dantes Viertel" });
+  audio.play().then(() => { $("banner").hidden = true; }).catch(() => { $("bannerTxt").textContent = `Ihr seid bei: ${s.name}.`; $("banner").hidden = false; });
+  if (user) map.panTo([s.lat, s.lng]);
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+}
+$("bannerBtn").onclick = () => { audio.play().catch(() => {}); $("banner").hidden = true; };
+$("ppBtn").onclick = () => { if (current < 0) { const n = nextStop() || STOPS[0]; playStop(n.i, true); return; } if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+audio.addEventListener("play", () => { audio.playbackRate = rate; setPlayerUi(); renderList(); });
+audio.addEventListener("pause", () => { setPlayerUi(); renderList(); });
+audio.addEventListener("timeupdate", () => { if (!audio.duration || current < 0) return; $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`; $("pCur").textContent = fmtTime(audio.currentTime); $("pDur").textContent = fmtTime(audio.duration); });
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  if (current >= 0) { heard.add(current); store.set("dan-de-heard", [...heard]); }
+  current = -1; $("pFill").style.width = "0"; $("pCur").textContent = "0:00"; $("pDur").textContent = "";
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+  if (queue.length) playStop(queue.shift(), false);
+});
+function renderSpeed() { document.querySelectorAll(".speed button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.r === rate)); }
+document.querySelectorAll(".speed button").forEach(b => b.onclick = () => { rate = +b.dataset.r; store.set("dan-rate", rate); audio.playbackRate = rate; renderSpeed(); });
+
+/* GPS */
+function onPos(pos) {
+  me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+  const ll = [me.lat, me.lng], hd = pos.coords.heading, moving = (pos.coords.speed || 0) > 0.4;
+  const cone = typeof hd === "number" && !isNaN(hd) && moving ? `<div class="me-cone" style="transform:rotate(${hd}deg)"></div>` : "";
+  const icon = L.divIcon({ className: "", html: `<div class="me-wrap">${cone}<div class="me-dot"></div></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+  if (!meMarker) {
+    meCircle = L.circle(ll, { radius: me.acc, color: "#1a73e8", weight: 1, fillOpacity: .1, interactive: false }).addTo(map);
+    meMarker = L.marker(ll, { icon, zIndexOffset: 1000, title: "Ihr seid hier" }).addTo(map);
+  } else { meMarker.setLatLng(ll).setIcon(icon); meCircle.setLatLng(ll).setRadius(me.acc); }
+  if (!centered) { map.setView(ll, 17); centered = true; } else if (follow) map.panTo(ll);
+  $("locateBtn").classList.add("on"); $("locateBtn").classList.toggle("follow", follow);
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = `Ihr · ±${Math.round(me.acc)} m`;
+  $("gpsMsg").textContent = `GPS an · Genauigkeit etwa ${Math.round(me.acc)} m`;
+  if (started && $("auto").checked) STOPS.forEach(s => {
+    if (triggered.has(s.i)) return;
+    if (haversine(me, s) <= s.r + Math.min(me.acc, 20)) {
+      triggered.add(s.i);
+      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      if (current < 0) playStop(s.i, false); else if (!queue.includes(s.i)) queue.push(s.i);
+    }
+  });
+  renderList(); renderNext();
+}
+function onErr(e) {
+  if (!me) { $("gpsChip").hidden = false; $("gpsChipTxt").textContent = e.code === 1 ? "Standort blockiert" : "Suche GPS…"; }
+  $("gpsMsg").textContent = e.code === 1 ? "Standort wurde verweigert. Erlaubt ihn in den Browser-Einstellungen und ladet neu. Ihr könnt jede Station auch mit ▶ abspielen." : "Suche noch GPS. Hohe Mauern stören manchmal.";
+  if (e.code === 1 && watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+function startGps() {
+  if (watchId !== null) return;
+  if (!("geolocation" in navigator)) { $("gpsMsg").textContent = "Dieser Browser kann keinen Standort teilen."; return; }
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = "Suche Standort…";
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+$("locateBtn").onclick = () => { startGps(); follow = true; $("locateBtn").classList.add("follow"); if (me) map.setView([me.lat, me.lng], Math.max(map.getZoom(), 17)); };
+try { navigator.permissions?.query({ name: "geolocation" }).then(st => { if (st.state === "granted") startGps(); }).catch(() => {}); } catch (e) {}
+async function keepAwake() { try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (started && document.visibilityState === "visible") keepAwake(); });
+
+$("startBtn").onclick = () => {
+  started = true;
+  audio.src = "audio/silence.mp3";   // Kurzer stummer Ton im Tipp, damit das Handy später automatisch abspielen darf.
+  audio.play().catch(() => {}).finally(() => { startGps(); if (me) onPos({ coords: { latitude: me.lat, longitude: me.lng, accuracy: me.acc } }); });
+  keepAwake();
+  $("startBtn").textContent = "Unterwegs ✓"; $("startBtn").disabled = true;
+  setPlayerUi(); renderNext();
+};
+$("resetBtn").onclick = () => { heard = new Set(); triggered = new Set(); queue = []; store.set("dan-de-heard", []); refreshPins(); renderList(); renderNext(); };
+renderSpeed(); refreshPins(); renderList(); setPlayerUi();
+</script>
+</body>
+</html>
