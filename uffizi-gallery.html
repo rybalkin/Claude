@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Inside the Uffizi</title>
+<meta name="description" content="A two-host audio guide to the Uffizi Gallery: 17 tracks, room by room, from Giotto to Artemisia Gentileschi.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a museum audio-guide handset. Number keys on top, tracks grouped by floor, a docked player.
+     Same marble palette as Florence on Foot; the gold accent stands for the gold-ground altarpieces. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --green: #2f6b57;
+    --gold: #9a6d14;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: max(20px, env(safe-area-inset-top, 0px)) 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+  .back { color: var(--green); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1.1; margin: 2px 0 6px; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 400; font-size: 1.35rem; margin: 6px 0 0; }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible, .track:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+  .offline { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--chip); border-radius: 14px; padding: 12px 14px; }
+  .offline p { margin: 0; flex: 1 1 220px; min-width: 0; font-size: .92rem; }
+  .offline.done { background: color-mix(in srgb, var(--green) 12%, var(--panel)); }
+
+  .keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 8px; }
+  .keys button { padding: 0; height: 48px; border-radius: 12px; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .keys button.heard { color: var(--muted); background: var(--chip); }
+  .keys button.now { background: var(--green); border-color: var(--green); color: #fff; }
+
+  ol.tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .track { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: start; scroll-margin-top: 16px; scroll-margin-bottom: 140px; }
+  .track.now { border-color: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 25%, transparent); }
+  .no { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--ink); color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track.heard .no { background: var(--muted); }
+  .track.now .no { background: var(--green); }
+  .track h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track p.look { margin: 6px 0 0; font-size: .93rem; }
+  .track details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .track summary { cursor: pointer; font-weight: 600; color: var(--green); }
+  .track details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .player .row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; align-items: center; }
+  .ctrls { display: flex; gap: 6px; align-items: center; }
+  .ctrls button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); }
+  .ctrls .pp { width: 52px; height: 52px; background: var(--green); color: #fff; }
+  .ctrls svg { width: 18px; height: 18px; } .ctrls .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--green); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .time label { display: inline-flex; gap: 6px; align-items: center; }
+  .time input { width: 16px; height: 16px; accent-color: var(--green); margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="uffizi-walk.html">← Walk to the Uffizi</a>
+    <div class="eyebrow" style="margin-top:10px">Galleria degli Uffizi · audio guide</div>
+    <h1>Inside the Uffizi</h1>
+    <p class="lede">Giulia and James take you room by room, from Giotto's golden Madonna to Artemisia Gentileschi: 17 short tracks, about 17 minutes in all. Tap the number of the work in front of you, or play them in order.</p>
+  </header>
+
+  <div class="offline" id="offline">
+    <p id="offTxt"><b>Signal can be weak inside.</b> Save all tracks to this phone now (12 MB) so they play without internet.</p>
+    <button type="button" id="offBtn">⬇ Save for offline</button>
+  </div>
+
+  <section>
+    <div class="eyebrow" style="margin-bottom:8px">Jump to track</div>
+    <div class="keys" id="keys" role="group" aria-label="Track numbers"></div>
+  </section>
+
+  <div id="list"></div>
+
+  <p class="fine">Voices, Italian phrases and gallery sounds made with ElevenLabs. Rooms are sometimes rearranged or closed. If a work isn't where you expect, ask a guard or check the map you get at the entrance. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <div class="row">
+      <div class="ctrls">
+        <button type="button" id="prevBtn" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button type="button" class="pp" id="ppBtn" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+        <button type="button" id="nextBtn" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      </div>
+      <div style="min-width:0">
+        <div class="t" id="pTitle">00 · Welcome to the Uffizi</div>
+        <div class="meta" id="pFloor">Press play to start</div>
+      </div>
+    </div>
+    <div class="bar" id="pBar"><i id="pFill"></i></div>
+    <div class="time"><span id="pCur">0:00</span><label><input type="checkbox" id="auto"> Play next track automatically</label><span id="pDur"></span></div>
+  </div>
+</div>
+<audio id="audio" preload="none"></audio>
+
+<script>
+const TRACKS = [{"slug": "00-welcome", "title": "Welcome to the Uffizi", "floor": "Second floor", "look": "Start at the top of the stairs, in the long corridor.", "dur": 73, "text": "Giulia: Benvenuti agli Uffizi! Welcome inside. It's Giulia again...\nJames: ...and James. This is your guide for inside the gallery. Each track goes with one room, or one masterpiece. Play them in order, or jump to whatever is in front of you.\nGiulia: The main collection begins on the second floor. Take the grand staircase, or the lift, all the way up.\nJames: When you arrive, you'll be in a long corridor, lined with ancient Roman statues and portrait busts.\nGiulia: And look up! The ceiling is covered in grotesques: little monsters, birds, dancing figures. Every section is different.\nJames: The paintings hang in the rooms that open off the corridor, roughly in the order they were made. So walking through the Uffizi is like walking through the Renaissance, step by step.\nGiulia: Take it slowly. Nobody sees everything in one visit, not even Florentines. Especially not Florentines.\nJames: Our first stop is in one of the very first rooms: three giant golden Madonnas. Play track one when you're standing in front of them."}, {"slug": "01-maesta", "title": "Three golden Madonnas", "floor": "Second floor", "look": "Cimabue, Duccio and Giotto: three huge gold altarpieces in one of the first rooms.", "dur": 77, "text": "James: Three huge golden altarpieces, all showing the same scene: the Madonna on her throne, with the Child, surrounded by angels.\nGiulia: They're called Maestà. Majesty. One by Cimabue, from around 1280. One by Duccio, from Siena. And one by Giotto, from around 1310.\nJames: Let's play spot the difference. Look at Cimabue's Madonna first. Beautiful, but flat. Like a golden icon.\nGiulia: Now look at Giotto's. She has a body! You can see her knees under her robe, and her weight sitting on the throne. The angels look up at her, and you see their faces from the side.\nJames: There's a legend that Giotto was a shepherd boy, discovered by Cimabue while he was drawing sheep on a rock.\nGiulia: And within a generation, the pupil had overtaken the master. Dante wrote about it, in the Divine Comedy. Credette Cimabue ne la pintura tener lo campo, e ora ha Giotto il grido.\nJames: Cimabue thought he ruled the field of painting, and now Giotto has all the fame.\nGiulia: So this room is where it all begins: painting starting to look at the real world."}, {"slug": "02-annunciation-martini", "title": "Simone Martini's Annunciation", "floor": "Second floor", "look": "A dazzling gold altarpiece from Siena, 1333. Look for the words coming out of the angel's mouth.", "dur": 54, "text": "Giulia: Now find a dazzling golden altarpiece with pointed arches: Simone Martini's Annunciation, from Siena, painted in 1333.\nJames: The angel Gabriel has just landed, still kneeling, his cloak fluttering behind him...\nGiulia: ...and look at Mary. She's not happy! She pulls away, clutching her cloak, as if to say: excuse me, who are you?\nJames: Now look at the space between them. The angel's words are engraved in the gold, coming straight out of his mouth. Ave gratia plena, Dominus tecum. Hail, full of grace, the Lord is with you.\nGiulia: It's a medieval speech bubble!\nJames: Gold leaf, deep blue made from lapis lazuli: the finest materials money could buy. It was made to glow in the candlelight of Siena's cathedral."}, {"slug": "03-urbino", "title": "The Duke and Duchess of Urbino", "floor": "Second floor", "look": "Two profile portraits facing each other, by Piero della Francesca. Walk around to see the backs.", "dur": 64, "text": "James: Next, find a pair of portraits facing each other in profile: the Duke and Duchess of Urbino, by Piero della Francesca.\nGiulia: Federico da Montefeltro, a famous military commander. Notice that we only ever see him from his left side.\nJames: Why?\nGiulia: He lost his right eye in a tournament. And see the strange dip at the top of his nose?\nJames: From the same accident?\nGiulia: The story says he had part of the bridge of his nose removed, so that he could see better with his one good eye.\nJames: And his wife, Battista Sforza, is so pale...\nGiulia: She died young, at twenty-six, soon after giving birth to their son. This portrait was probably painted after her death. That's why the couple face each other, forever.\nJames: Behind them, look at the landscapes: hills and lakes melting into the distance. And walk around the back: the panels are painted on both sides, with the couple riding in triumphal carts."}, {"slug": "04-lippi", "title": "Filippo Lippi's Madonna: a love story", "floor": "Second floor", "look": "A Madonna in profile with a transparent veil, and an angel grinning out at you.", "dur": 55, "text": "Giulia: Now, a love story. Find a Madonna in profile, with a delicate transparent veil, and a little angel grinning out at you.\nJames: This is Filippo Lippi's Madonna with Child and Two Angels. Lippi was a monk...\nGiulia: ...and a terrible one. While he was painting for a convent in Prato, he fell in love with a young nun, Lucrezia Buti.\nJames: And they ran away together.\nGiulia: They had a son, Filippino, who became a great painter too. And Lucrezia is said to be the model for this Madonna.\nJames: The Medici asked the Pope to release them both from their vows. Historians still argue about whether they ever actually married.\nGiulia: So this may be a portrait of a woman, painted by the man who loved her. You can feel it, can't you?\nJames: And don't miss the angel at the bottom, looking out at you with a cheeky smile."}, {"slug": "05-primavera", "title": "Botticelli: Primavera", "floor": "Second floor", "look": "The big dark orange grove full of figures, in the Botticelli rooms. Read it from right to left.", "dur": 71, "text": "James: And now, the Botticelli rooms. Take a breath.\nGiulia: Start with the Primavera: the big painting of a dark orange grove, full of figures. Read it from right to left.\nJames: On the far right, Zephyr, the blue-green wind god, grabs the nymph Chloris...\nGiulia: ...and as he touches her, flowers spill from her mouth, and she becomes Flora, the goddess of spring, in her flowered dress.\nJames: In the centre stands Venus. Above her, Cupid flies blindfolded, aiming his arrow.\nGiulia: At the three Graces, dancing in their see-through dresses. And the one in the middle is gazing at...\nJames: ...Mercury, on the far left, who's busy poking the clouds with his staff, and not paying her any attention at all.\nGiulia: Typical.\nJames: Now look down at the meadow. Botanists have counted around one hundred and ninety different kinds of flowers here, many of them from the hills around Florence.\nGiulia: It may have been painted for a Medici wedding, around 1480. Spring, love, new life. Perfect for the two of you."}, {"slug": "06-venus", "title": "Botticelli: The Birth of Venus", "floor": "Second floor", "look": "Venus on her shell. Step back to see her float.", "dur": 70, "text": "Giulia: And here she is. La Nascita di Venere. The Birth of Venus.\nJames: Venus has just been born from the sea foam, and she arrives on the shore standing on a scallop shell.\nGiulia: On the left, the winds blow her ashore, wrapped in each other's arms, with roses falling around them. On the right, a nymph of spring rushes to cover her with a flowered cloak.\nJames: Now look carefully at Venus. Her neck is too long. Her left shoulder slopes impossibly. She couldn't really stand like that.\nGiulia: And it doesn't matter at all. Botticelli wasn't painting a real woman. He was painting an idea of beauty.\nJames: It's one of the first large paintings since ancient times to show a nude goddess, rather than a religious scene.\nGiulia: And the legend says her face belongs to Simonetta Vespucci, the most admired woman in Florence, who died at twenty-two. Botticelli asked to be buried near her, in the church of Ognissanti...\nJames: ...and he was.\nGiulia: Step back, and see how she seems to float, almost weightless, on that shell."}, {"slug": "07-leonardo", "title": "Leonardo's room", "floor": "Second floor", "look": "Three works: the Baptism of Christ, the Annunciation, and the unfinished Adoration of the Magi.", "dur": 80, "text": "James: Now, Leonardo's room. Three paintings, and each one has a story.\nGiulia: First, the Baptism of Christ. It was painted by Leonardo's teacher, Andrea del Verrocchio. But look at the two angels in the bottom left corner.\nJames: The one on the far left, turning his head, was painted by the young Leonardo.\nGiulia: And the story goes that when Verrocchio saw it, he was so humbled that he swore never to paint again.\nJames: Probably not true. But look at those curls, and the light on that face, and you understand why people believed it.\nGiulia: Next, the Annunciation. Leonardo was only about twenty. Look at the angel's wings: they're modelled on real birds' wings. He studied birds all his life.\nJames: And look into the far distance: mountains turning blue in the haze. That's Leonardo noticing how the air changes colour with distance.\nGiulia: Finally, the Adoration of the Magi. Brown, unfinished, full of swirling figures. He left Florence for Milan before he could finish it.\nJames: It was restored a few years ago, and now you can see his drawing underneath. Like looking straight into Leonardo's mind."}, {"slug": "08-tribuna", "title": "The Tribuna", "floor": "Second floor", "look": "The octagonal red room with a dome of shells. Look in from the doorways.", "dur": 54, "text": "Giulia: Now look for an octagonal room with red walls and a dome glittering with shells. You can't walk in, but you can look from the doorways.\nJames: This is the Tribuna, built in the fifteen-eighties for Grand Duke Francesco the First. The Medici treasure chamber.\nGiulia: Look up. The dome is covered with thousands of mother-of-pearl shells.\nJames: The whole room was designed around the four elements: air, water, fire and earth.\nGiulia: In the centre stands the ancient marble Medici Venus. For the young English and German aristocrats on the Grand Tour in the seventeen hundreds, this room was the high point of the whole journey to Italy.\nJames: There's a famous painting of them, crammed in here, measuring the statues and arguing about art.\nGiulia: Nothing changes. Just more phones."}, {"slug": "09-window", "title": "The view of Ponte Vecchio", "floor": "Second floor", "look": "The windows in the short corridor over the river, between the two wings.", "dur": 52, "text": "James: Pause here, at the windows in the short corridor that joins the two long wings, right above the river.\nGiulia: Look out over the Arno. That's the Ponte Vecchio, with its little shops hanging over the water.\nJames: And above the shops, see that long line of small windows? That's the Vasari Corridor.\nGiulia: A private passage, nearly a kilometre long, built in 1565, so the Medici could walk from their offices here to their palace on the other side of the river...\nJames: ...without ever mixing with the crowds below.\nGiulia: It was built for a wedding, too: the marriage of Francesco de' Medici and Joanna of Austria.\nJames: Take a moment, the two of you. This is one of the best views in Florence, and most people rush right past it."}, {"slug": "10-doni-tondo", "title": "Michelangelo: the Doni Tondo", "floor": "Second floor", "look": "A round painting in a spectacular carved gold frame.", "dur": 70, "text": "Giulia: Now find a round painting in a spectacular carved gold frame: the Doni Tondo, by Michelangelo.\nJames: It was painted around 1505 as a wedding present, for the marriage of Agnolo Doni and Maddalena Strozzi.\nGiulia: And there's a story about the bill. When it was finished, Michelangelo asked for seventy ducats. Doni thought that was too much, and sent forty.\nJames: So Michelangelo sent it back and demanded... a hundred.\nGiulia: And in the end, Doni paid a hundred and forty! Never argue with Michelangelo.\nJames: Look at Mary. She twists to lift the Child over her shoulder, with arms like a sculptor's model.\nGiulia: You can tell he was really a sculptor. And the colours are bright, almost electric: pinks, oranges, greens.\nJames: Behind them, those nude young men lounging on a wall. Nobody is quite sure what they mean.\nGiulia: It's the only finished panel painting by Michelangelo that survives. Imagine getting that as a wedding present."}, {"slug": "11-raphael", "title": "Raphael: the Madonna of the Goldfinch", "floor": "Second floor", "look": "A gentle Madonna in a green meadow, two little boys and a tiny bird.", "dur": 66, "text": "James: Close by are the Raphaels. Look for a gentle Madonna in a green meadow, with two little boys and a tiny bird.\nGiulia: The Madonna of the Goldfinch. Il Cardellino. Little John the Baptist offers the bird to the baby Jesus.\nJames: The goldfinch was a symbol of Christ's Passion, because it feeds among thorns. So there's a shadow of the future in this sweet scene.\nGiulia: And guess what: this was a wedding present too. Raphael painted it for his friend Lorenzo Nasi, when he was only about twenty-two.\nJames: Then, in the fifteen-forties, the Nasi house collapsed in a landslide, and the painting broke into seventeen pieces.\nGiulia: It was put back together with nails. It took a ten-year restoration, finished in 2008, to bring back these colours.\nJames: Two wedding presents, close together: one fiery, one tender. Michelangelo, and Raphael.\nGiulia: So, which one would you choose?"}, {"slug": "12-terrace", "title": "Break on the terrace", "floor": "Second floor", "look": "The café at the end of the west wing, on the roof of the Loggia dei Lanzi.", "dur": 37, "text": "Giulia: Time for a break! Follow the signs for the café, at the end of the west wing.\nJames: You're now standing on the roof of the Loggia dei Lanzi...\nGiulia: ...and right in front of you, so close you could almost touch it, the tower of Palazzo Vecchio.\nJames: And behind it, Brunelleschi's dome.\nGiulia: Order un caffè, or a spritz if it's late enough, and just sit for a while. Your feet will thank you.\nJames: When you're ready, head down to the first floor for the last part: Titian, Caravaggio, and Artemisia."}, {"slug": "13-titian", "title": "Titian: the Venus of Urbino", "floor": "First floor", "look": "A reclining nude woman in a palace bedroom, looking straight at you.", "dur": 55, "text": "James: On the first floor, find a reclining nude woman, looking straight at you: Titian's Venus of Urbino, from 1538.\nGiulia: Unlike Botticelli's Venus, she's not a goddess on a shell. She's lying in a real bedroom, in a real palace.\nJames: It was painted for Guidobaldo della Rovere, the future Duke of Urbino, and it's often linked to his marriage.\nGiulia: So, read the clues. The little dog asleep at her feet: fidelity. The roses in her hand: love. And in the background, two maids are looking through a wedding chest, a cassone, for her clothes.\nJames: Not everyone approved. Mark Twain called her the foulest, the vilest, the obscenest picture the world possesses.\nGiulia: Which, of course, made everyone want to see her even more."}, {"slug": "14-caravaggio", "title": "Caravaggio", "floor": "First floor", "look": "The Medusa shield and the young Bacchus. Look for a tiny reflection in the wine carafe.", "dur": 51, "text": "Giulia: Now, Caravaggio. Look for the paintings with dramatic light and deep shadows.\nJames: First, the Medusa. It's painted on a real, round, curved parade shield.\nGiulia: A gift for Grand Duke Ferdinando de' Medici. Medusa's head has just been cut off, and she's still screaming, with snakes writhing in her hair.\nJames: And the face... may well be Caravaggio's own.\nGiulia: Next, his Bacchus: a plump young god offering you a glass of wine, with dirty fingernails and fruit that's going slightly rotten.\nJames: Look very closely at the glass carafe of wine, bottom left. In the reflection, researchers found a tiny figure, thought to be Caravaggio himself, at his easel.\nGiulia: A selfie, four hundred years early!"}, {"slug": "15-artemisia", "title": "Artemisia Gentileschi", "floor": "First floor", "look": "Judith Slaying Holofernes, near the Caravaggios. Powerful and violent.", "dur": 56, "text": "James: Close by hangs one of the most powerful paintings in the gallery: Judith Slaying Holofernes, by Artemisia Gentileschi.\nGiulia: It's violent. Judith and her maid hold down the general Holofernes, and Judith cuts his throat. Blood spurts across the sheets.\nJames: Artemisia painted it around 1620. Some years before, in Rome, she had been raped by a painter who worked with her father...\nGiulia: ...and at the trial, she was tortured herself, to test whether she was telling the truth. She never changed her story.\nJames: Many people see this painting as her answer. These women do not hesitate.\nGiulia: In Florence, she became the first woman admitted to the Academy of the Arts of Drawing, in 1616.\nJames: Four hundred years later, she's finally as famous as she deserves to be."}, {"slug": "16-goodbye", "title": "Arrivederci", "floor": "Exit", "look": "On your way out.", "dur": 32, "text": "Giulia: And that's our tour of the Uffizi.\nJames: There's so much more, of course. If you still have energy, wander. Every room has something.\nGiulia: When you leave, walk to the river end of the courtyard. Ponte Vecchio is just to your right.\nJames: And then, I think, a gelato is in order.\nGiulia: Assolutamente! Grazie for spending the morning with us.\nJames: Enjoy the rest of Florence together.\nGiulia: Ciao, ciao!"}];
+const CACHE = "uffizi-gallery-v1";
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+const url = t => `audio/uffizi-gallery/${t.slug}.mp3`;
+const num = i => String(i).padStart(2, "0");
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let heard = new Set(store.get("gallery-heard", []));
+let current = store.get("gallery-current", 0);
+let blobUrl = null, wakeLock = null;
+$("auto").checked = store.get("gallery-auto", false);
+$("auto").onchange = () => store.set("gallery-auto", $("auto").checked);
+
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+function render() {
+  const playing = !audio.paused;
+  $("keys").innerHTML = TRACKS.map((t, i) => `<button type="button" data-i="${i}" class="${i === current && audio.src ? "now" : heard.has(i) ? "heard" : ""}" aria-label="Track ${i}: ${esc(t.title)}">${num(i)}</button>`).join("");
+  let html = "", floor = null;
+  TRACKS.forEach((t, i) => {
+    if (t.floor !== floor) { if (floor !== null) html += "</ol>"; floor = t.floor; html += `<h2>${esc(floor)}</h2><ol class="tracks">`; }
+    const now = i === current && audio.src;
+    html += `<li class="track ${now ? "now" : ""} ${heard.has(i) ? "heard" : ""}" id="t-${i}">
+      <span class="no">${num(i)}</span>
+      <div style="min-width:0">
+        <h3>${esc(t.title)}</h3>
+        <div class="meta">${fmt(t.dur)}${heard.has(i) ? " · ✓ heard" : ""}</div>
+        <p class="look">${esc(t.look)}</p>
+        <details><summary>Read along</summary><p>${esc(t.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${i}" aria-label="${now && playing ? "Pause" : "Play"} track ${i}">${now && playing ? pauseSvg : playSvg}</button></li>`;
+  });
+  $("list").innerHTML = html + "</ol>";
+  document.querySelectorAll("#keys button, .track .play").forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (i === current && audio.src && !audio.paused) audio.pause(); else play(i, b.closest("#keys") !== null);
+  });
+  const t = TRACKS[current];
+  $("pTitle").textContent = `${num(current)} · ${t.title}`;
+  $("pFloor").textContent = audio.src ? t.floor : "Press play to start";
+  $("ppIcon").innerHTML = playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l13-7.5z"/>';
+  $("ppBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
+  $("prevBtn").disabled = current === 0; $("nextBtn").disabled = current === TRACKS.length - 1;
+}
+
+async function sourceFor(t) {
+  // Use the copy saved on the phone when there is one, so tracks play without signal.
+  try {
+    if ("caches" in window) {
+      const hit = await (await caches.open(CACHE)).match(url(t));
+      if (hit) { if (blobUrl) URL.revokeObjectURL(blobUrl); blobUrl = URL.createObjectURL(await hit.blob()); return blobUrl; }
+    }
+  } catch (e) {}
+  return url(t);
+}
+async function play(i, scroll) {
+  current = i; store.set("gallery-current", i);
+  const t = TRACKS[i];
+  audio.src = await sourceFor(t);
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: `${num(i)} · ${t.title}`, artist: "Giulia & James", album: "Inside the Uffizi" });
+  audio.play().catch(() => {});
+  keepAwake();
+  render();
+  if (scroll) $("t-" + i).scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("ppBtn").onclick = () => { if (!audio.src) play(current, true); else if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+$("prevBtn").onclick = () => { if (current > 0) play(current - 1, true); };
+$("nextBtn").onclick = () => { if (current < TRACKS.length - 1) play(current + 1, true); };
+if ("mediaSession" in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler("previoustrack", () => $("prevBtn").onclick());
+    navigator.mediaSession.setActionHandler("nexttrack", () => $("nextBtn").onclick());
+  } catch (e) {}
+}
+audio.addEventListener("play", render);
+audio.addEventListener("pause", render);
+audio.addEventListener("timeupdate", () => {
+  if (!audio.duration) return;
+  $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`;
+  $("pCur").textContent = fmt(audio.currentTime); $("pDur").textContent = fmt(audio.duration);
+});
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  heard.add(current); store.set("gallery-heard", [...heard]);
+  if ($("auto").checked && current < TRACKS.length - 1) play(current + 1, true);
+  else { $("pFill").style.width = "100%"; render(); }
+});
+async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); } } catch (e) {} }
+$("resetBtn").onclick = () => { heard = new Set(); store.set("gallery-heard", []); render(); };
+
+/* ---------- offline ---------- */
+async function checkOffline() {
+  try {
+    if (!("caches" in window)) { $("offline").hidden = true; return; }
+    const c = await caches.open(CACHE); const keys = await c.keys();
+    if (keys.length >= TRACKS.length) { $("offline").classList.add("done"); $("offTxt").innerHTML = "<b>✓ Saved on this phone.</b> All 17 tracks play without internet."; $("offBtn").hidden = true; }
+  } catch (e) { $("offline").hidden = true; }
+}
+$("offBtn").onclick = async () => {
+  $("offBtn").disabled = true;
+  try {
+    const c = await caches.open(CACHE); let done = 0;
+    for (const t of TRACKS) {
+      if (!(await c.match(url(t)))) { const r = await fetch(url(t)); if (!r.ok) throw new Error(r.status); await c.put(url(t), r); }
+      done++; $("offBtn").textContent = `Saving… ${done}/${TRACKS.length}`;
+    }
+    checkOffline();
+  } catch (e) {
+    $("offBtn").disabled = false; $("offBtn").textContent = "⬇ Try again";
+    $("offTxt").innerHTML = "<b>Saving stopped.</b> The connection dropped. Tap Try again; tracks already saved are kept.";
+  }
+};
+checkOffline();
+render();
+</script>
+</body>
+</html>
