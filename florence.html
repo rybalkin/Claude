@@ -151,6 +151,7 @@
   .leaflet-popup-content p { margin: 0 0 8px; }
   .leaflet-container a.btn { color: var(--ink); }
   .leaflet-control-attribution { font-size: 10px; }
+  .dark-tiles .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7); }
   .wrap-map { position: relative; }
   @media (max-width: 860px) { .wrap-map { position: sticky; top: 0; z-index: 1; } }
 </style>
@@ -311,11 +312,13 @@ const map = L.map("map", { zoomControl: false, attributionControl: true }).setVi
 L.control.zoom({ position: "topright" }).addTo(map);
 const dark = window.matchMedia("(prefers-color-scheme: dark)");
 const isDark = () => document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && dark.matches);
-const tileUrl = () => `https://{s}.basemaps.cartocdn.com/${isDark() ? "dark_all" : "rastertiles/voyager"}/{z}/{x}/{y}{r}.png`;
-const tiles = L.tileLayer(tileUrl(), {
-  maxZoom: 19, subdomains: "abcd",
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+// OpenStreetMap tiles need no API key. Dark mode tints the same tiles with a CSS filter.
+const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
+const tintTiles = () => document.getElementById("map").classList.toggle("dark-tiles", isDark());
+tintTiles();
 
 const markers = [];
 const lines = {};
@@ -496,7 +499,7 @@ try {
 } catch (e) {}
 
 /* ---------- theme ---------- */
-function onTheme() { tiles.setUrl(tileUrl()); drawMap(); if (meCircle) meCircle.setStyle({ color: css("--me") }); }
+function onTheme() { tintTiles(); drawMap(); if (meCircle) meCircle.setStyle({ color: css("--me") }); }
 dark.addEventListener?.("change", onTheme);
 new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
