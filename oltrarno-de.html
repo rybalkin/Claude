@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Oltrarno zu zweit</title>
+<meta name="description" content="GPS-Audiotour auf Deutsch (Niveau B2) durch das Oltrarno: von der Ponte Santa Trinita bis zur Ponte Vecchio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  /* Layout: map on top, walk controls and stops below, player docked to the bottom.
+     Marble palette shared with Florence on Foot; the rose accent marks the Oltrarno walk, as on the main map. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --rose: #a84d56;
+    --me: #1a73e8;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+  .mapwrap { position: relative; }
+  #map { height: 42vh; height: 42svh; min-height: 260px; background: var(--chip); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: 18px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2rem; line-height: 1.1; margin: 2px 0 4px; text-wrap: balance; }
+  .lede { margin: 0; color: var(--muted); }
+  .back { color: var(--rose); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+  button.primary { background: var(--rose); border-color: var(--rose); color: #fff; font-size: 1.05rem; padding: 12px 22px; }
+  .badge { display: inline-block; background: var(--rose); color: #fff; border-radius: 6px; padding: 1px 8px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; vertical-align: 2px; }
+
+  .start { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .start p { margin: 0; font-size: .95rem; }
+  .start .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .92rem; color: var(--muted); }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--rose); }
+  .speed { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .speed button { border: 0; border-radius: 0; padding: 5px 12px; background: transparent; font-variant-numeric: tabular-nums; }
+  .speed button[aria-pressed="true"] { background: var(--chip); }
+
+  .next { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 12px; align-items: center; background: var(--chip); border-radius: 14px; padding: 14px; }
+  .next .arrow { width: 44px; height: 44px; border-radius: 50%; background: var(--me); color: #fff; display: grid; place-items: center; font-size: 20px; }
+  .next b { display: block; font-size: 1.05rem; }
+  .next span { color: var(--muted); font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .banner { background: #fff4d6; border: 1px solid #e8cf86; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+  ol.stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .stop { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 12px; align-items: start; }
+  .stop.playing { border-color: var(--rose); box-shadow: 0 0 0 2px color-mix(in srgb, var(--rose) 25%, transparent); }
+  .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--rose); color: #fff; font-weight: 700; font-size: .85rem; }
+  .stop.heard .num { background: var(--muted); }
+  .stop h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .meta .d { color: var(--me); font-weight: 600; }
+  .stop p.look { margin: 6px 0 0; font-size: .93rem; }
+  .vocab { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .vocab li { background: var(--chip); border-radius: 8px; padding: 3px 9px; font-size: .85rem; }
+  .vocab li i { color: var(--muted); font-style: normal; }
+  .stop details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .stop summary { cursor: pointer; font-weight: 600; color: var(--rose); }
+  .stop details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: 52px minmax(0,1fr); gap: 12px; align-items: center; }
+  .player .pp { width: 52px; height: 52px; padding: 0; display: grid; place-items: center; background: var(--rose); border-color: var(--rose); color: #fff; }
+  .player .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; margin-top: 6px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--rose); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
+
+  .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 700 13px/1 var(--body); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: var(--rose); }
+  .pin.heard { background: var(--muted); }
+  .pin.now { background: var(--ink); transform: scale(1.2); }
+  .locate { position: absolute; z-index: 500; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 16px; width: 48px; height: 48px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.25); color: var(--muted); }
+  .locate svg { width: 22px; height: 22px; }
+  .locate.on { color: var(--me); }
+  .locate.follow { background: var(--me); color: #fff; border-color: var(--me); }
+  .gpschip { position: absolute; z-index: 500; left: max(12px, env(safe-area-inset-left, 0px)); top: 12px; background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: .85rem; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.2); font-variant-numeric: tabular-nums; }
+  .me-wrap { position: relative; width: 18px; height: 18px; }
+  .me-cone { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin-left: -9px; margin-top: -30px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid color-mix(in srgb, var(--me) 55%, transparent); transform-origin: 50% 30px; }
+  .me-dot { position: absolute; inset: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 30%, transparent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .me-dot { animation: pulse 2s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--me) 45%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+  }
+</style>
+</head>
+<body>
+<div class="mapwrap">
+  <div id="map" role="region" aria-label="Karte des Spaziergangs"></div>
+  <div class="gpschip" id="gpsChip" hidden>📍 <span id="gpsChipTxt"></span></div>
+  <button class="locate" id="locateBtn" type="button" aria-label="Meinen Standort zeigen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+  </button>
+</div>
+
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <div class="eyebrow" style="margin-top:10px">Ponte Santa Trinita → Ponte Vecchio · Audiotour <span class="badge">Deutsch B2</span></div>
+    <h1>Oltrarno zu zweit</h1>
+    <p class="lede">Ein Rundgang von etwa 2 km auf der anderen Seite des Arno: Weinfenster, Brunelleschi, ein Dichterpaar, der Palazzo Pitti und eine kleine Kirche mit einem großen Bild. Giulia und Lukas erzählen, und jede Geschichte startet automatisch, wenn ihr ankommt.</p>
+  </header>
+
+  <div class="start">
+    <p><b>Vor dem Start:</b> Lautstärke hoch, oder teilt euch die Kopfhörer. Lasst diese Seite offen und den Bildschirm an. Im Hintergrund pausiert das Handy das GPS.</p>
+    <div class="row">
+      <button class="primary" id="startBtn" type="button">▶ Spaziergang starten</button>
+      <label class="toggle"><input type="checkbox" id="auto" checked> Bei Ankunft automatisch abspielen</label>
+    </div>
+    <div class="row">
+      <span class="toggle">Tempo</span>
+      <div class="speed" role="group" aria-label="Sprechtempo">
+        <button type="button" data-r="0.8">0,8×</button><button type="button" data-r="0.9">0,9×</button><button type="button" data-r="1">1×</button>
+      </div>
+    </div>
+    <p class="fine" id="gpsMsg">Beim Start fragt das Handy nach eurem Standort.</p>
+  </div>
+
+  <div class="banner" id="banner" hidden><span id="bannerTxt"></span><button type="button" id="bannerBtn">▶ Abspielen</button></div>
+  <div class="next" id="next" hidden><div class="arrow" aria-hidden="true">➜</div><div><b id="nextName"></b><span id="nextDist"></span></div></div>
+
+  <ol class="stops" id="stops"></ol>
+
+  <p class="fine">Stimmen und Geräusche: ElevenLabs. Die Linie auf der Karte zeigt die Reihenfolge, nicht jede Straße genau. Öffnungszeiten der Kirchen bitte vor Ort prüfen. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Fortschritt zurücksetzen</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <button class="pp" id="ppBtn" type="button" aria-label="Abspielen"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+    <div style="min-width:0">
+      <div class="t" id="pTitle">Starten, dann zu Station 1 gehen</div>
+      <div class="bar" id="pBar"><i id="pFill"></i></div>
+      <div class="time"><span id="pCur">0:00</span><span id="pDur"></span></div>
+    </div>
+  </div>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const STOPS = [{"slug": "01-santa-trinita", "name": "Ponte Santa Trinita", "sub": "", "lat": 43.7693, "lng": 11.2502, "r": 35, "look": "Der schönste Blick auf die Ponte Vecchio. An den Ecken: die vier Jahreszeiten.", "vocab": [["die Brücke", "bridge"], ["sprengen", "to blow up"], ["der Rückzug", "retreat"], ["flussaufwärts", "upstream"], ["die Jahreszeit", "season"]], "dur": 80, "text": "Giulia: Ciao, und herzlich willkommen! Ich bin Giulia.\nLukas: Und ich bin Lukas. Heute gehen wir zusammen ins Oltrarno. So nennen die Florentiner das Viertel auf der anderen Seite des Arno.\nGiulia: Wir stehen auf der Ponte Santa Trinita. Schaut mal nach links, flussaufwärts. Dort seht ihr die Ponte Vecchio mit ihren kleinen Häusern. Von hier hat man den schönsten Blick auf die alte Brücke.\nLukas: Und die Brücke, auf der wir stehen, hat eine dramatische Geschichte. Sie wurde 1569 gebaut, mit sehr eleganten, flachen Bögen.\nGiulia: Im August 1944 hat die deutsche Wehrmacht beim Rückzug alle Brücken von Florenz gesprengt. Alle, außer der Ponte Vecchio.\nLukas: Nach dem Krieg haben die Florentiner die Brücke wieder aufgebaut, und zwar mit den Originalsteinen. Viele davon hat man aus dem Fluss geholt.\nGiulia: An den Ecken stehen vier Statuen: die vier Jahreszeiten. Aber der Frühling hatte nach dem Krieg keinen Kopf mehr.\nLukas: Und wo war der Kopf?\nGiulia: Im Arno! Erst 1961 hat man ihn im Fluss wiedergefunden. Siebzehn Jahre später!\nLukas: Geht jetzt über die Brücke, und dann nach rechts, in die Via Santo Spirito."}, {"slug": "02-weinfenster", "name": "Das Weinfenster", "sub": "Via Santo Spirito", "lat": 43.76895, "lng": 11.2487, "r": 25, "look": "Ein kleines Fenster mit Bogen in der Hauswand: Hier gibt es heute wieder Wein und Eis.", "vocab": [["das Weinfenster", "wine window"], ["der Zwischenhändler", "middleman"], ["die Pest", "plague"], ["desinfizieren", "to disinfect"], ["die Schaufel", "shovel"]], "dur": 75, "text": "Giulia: Achtung, jetzt müsst ihr gut aufpassen! Schaut an die Hauswände. Seht ihr kleine Fenster in Form eines Bogens, ungefähr auf Hüfthöhe?\nLukas: Das sind die buchette del vino, die Weinfenster. In Florenz gibt es mehr als hundert davon.\nGiulia: Die reichen Familien hatten Weinberge auf dem Land. Den Wein haben sie direkt aus ihrem Palast verkauft, durch dieses kleine Fenster. Ganz ohne Zwischenhändler.\nLukas: Und während der Pest im siebzehnten Jahrhundert waren die Fenster besonders praktisch. Man konnte Wein kaufen, ohne den Verkäufer zu berühren.\nGiulia: Das Geld legte man auf eine kleine Schaufel. Und manchmal wurden die Münzen sogar mit Essig desinfiziert.\nLukas: Kontaktloses Bezahlen, vierhundert Jahre vor Corona!\nGiulia: Genau! Und während Corona haben einige Weinfenster tatsächlich wieder aufgemacht. Hier könnt ihr euch heute ein Glas Wein oder ein Eis durch das Fenster holen.\nLukas: Zwei Gläser Rotwein, ein bisschen Sonne... Ich finde, das ist eine sehr gute Idee für euch zwei.\nGiulia: Danach geht es weiter nach Süden, zur Piazza Santo Spirito. Das sind nur ein paar Minuten."}, {"slug": "03-santo-spirito", "name": "Piazza Santo Spirito", "sub": "", "lat": 43.7663, "lng": 11.2479, "r": 40, "look": "Das Wohnzimmer des Oltrarno. In der Kirche: ein Holzkreuz des jungen Michelangelo.", "vocab": [["das Wohnzimmer", "living room"], ["die Fassade", "facade"], ["die Säule", "column"], ["schnitzen", "to carve"], ["der Entwurf", "design, plan"]], "dur": 79, "text": "Lukas: Willkommen auf der Piazza Santo Spirito, dem Wohnzimmer des Oltrarno.\nGiulia: Hier ist es ganz anders als rund um den Dom: weniger Touristen, mehr Florentiner. Morgens gibt es einen kleinen Markt. Und abends sitzen die Leute mit einem Aperitivo auf den Stufen der Kirche.\nLukas: Die Fassade der Kirche sieht ziemlich langweilig aus, oder? Einfach glatt und hell.\nGiulia: Ja, sie wurde nie fertig. Aber innen ist sie wunderschön. Der Entwurf stammt von Filippo Brunelleschi, dem Architekten der Domkuppel. Gebaut wurde sie aber größtenteils erst nach seinem Tod.\nLukas: Innen stehen graue Steinsäulen in perfekten Reihen. Wie ein Gedicht aus Mathematik.\nGiulia: Und in der Sakristei gibt es ein Geheimnis: ein Holzkreuz von Michelangelo. Er war damals erst ungefähr siebzehn Jahre alt.\nLukas: Die Mönche hier hatten ein Krankenhaus. Der junge Michelangelo durfte die Körper von Verstorbenen studieren, um die Anatomie zu lernen. Als Dank hat er dieses Kreuz geschnitzt.\nGiulia: Schaut einfach, ob die Kirche gerade offen ist. Es lohnt sich.\nLukas: Jetzt gehen wir weiter zur Piazza San Felice. Auch das sind nur wenige Minuten."}, {"slug": "04-casa-guidi", "name": "Casa Guidi", "sub": "", "lat": 43.765, "lng": 11.2489, "r": 25, "look": "Ein unauffälliges Haus mit Gedenktafel: Hier lebten die Dichter Elizabeth und Robert Browning.", "vocab": [["die Gedenktafel", "memorial plaque"], ["heimlich", "secretly"], ["fliehen", "to flee, to elope"], ["der Vers", "verse"], ["schmieden", "to forge"]], "dur": 67, "text": "Giulia: Hier, an der Piazza San Felice, steht ein unauffälliges Haus mit einer Gedenktafel. Das ist die Casa Guidi.\nLukas: Hier wohnte ein berühmtes Liebespaar: die englischen Dichter Elizabeth Barrett und Robert Browning.\nGiulia: Ihre Geschichte ist wie ein Roman. Elizabeth war krank und lebte in London fast nur in ihrem Zimmer. Und ihr Vater wollte nicht, dass sie heiratet.\nLukas: Robert hat sich zuerst in ihre Gedichte verliebt. In seinem ersten Brief schrieb er: Ich liebe Ihre Verse von ganzem Herzen... und ich liebe auch Sie.\nGiulia: Wie romantisch. 1846 haben die beiden heimlich geheiratet und sind nach Italien geflohen.\nLukas: In Florenz ging es Elizabeth viel besser. Sie haben fast fünfzehn Jahre in diesem Haus gelebt.\nGiulia: Auf der Tafel steht, dass Elizabeth mit ihren Versen einen goldenen Ring zwischen Italien und England geschmiedet hat.\nLukas: Ein goldener Ring. Wie passend für ein Liebespaar.\nGiulia: Von hier sind es nur ein paar Schritte bis zum Palazzo Pitti."}, {"slug": "05-pitti", "name": "Palazzo Pitti", "sub": "", "lat": 43.7654, "lng": 11.2501, "r": 45, "look": "Der riesige, leicht ansteigende Platz vor dem Palast. Dahinter: der Boboli-Garten.", "vocab": [["ansteigen", "to slope upwards"], ["pleitegehen", "to go bankrupt"], ["ausgerechnet", "of all people"], ["die Zypressenallee", "cypress avenue"], ["das Vorbild", "model, example"]], "dur": 76, "text": "Lukas: Und plötzlich öffnet sich dieser riesige Platz. Vor euch steht der Palazzo Pitti.\nGiulia: Er wurde für Luca Pitti gebaut, einen reichen Bankier. Er wollte einen Palast, der größer ist als der Palast der Medici.\nLukas: Und die Geschichte hat Humor. Einige Jahrzehnte später hatte die Familie Pitti kein Geld mehr. Und 1550 haben ausgerechnet die Medici den Palast gekauft!\nGiulia: Genauer gesagt Eleonora von Toledo, die Frau von Herzog Cosimo dem Ersten. Sie wollte mehr Licht, mehr Luft und einen großen Garten für ihre elf Kinder.\nLukas: So entstand hinter dem Palast der Boboli-Garten, mit Grotten, Statuen und langen Zypressenalleen. Er wurde ein Vorbild für viele Gärten in Europa.\nGiulia: Später wohnte hier Napoleons Schwester. Und noch später die Könige von Italien, als Florenz ein paar Jahre lang Hauptstadt war.\nLukas: Ein Tipp: Setzt euch einfach eine Weile auf den Platz, wie die Florentiner. Am Nachmittag sind die Steine schön warm.\nGiulia: Danach gehen wir zurück Richtung Fluss, durch die kleinen Gassen. Unser nächstes Ziel ist ein winziger Platz: die Piazza della Passera."}, {"slug": "06-passera", "name": "Piazza della Passera", "sub": "", "lat": 43.7668, "lng": 11.2511, "r": 25, "look": "Ein winziger Platz mit Werkstätten, kleinen Lokalen und einer berühmten Eisdiele.", "vocab": [["der Spatz", "sparrow"], ["der Handwerker", "craftsman"], ["die Werkstatt", "workshop"], ["die Eisdiele", "ice-cream parlour"], ["die Sorte", "flavour, kind"]], "dur": 58, "text": "Giulia: Das hier ist eine meiner Lieblingsecken in Florenz: die Piazza della Passera. Klein, ruhig, mit ein paar Tischen draußen.\nLukas: Passera heißt auf Deutsch Spatz. Woher der Name kommt, weiß niemand genau. Es gibt mehrere Legenden, eine davon erzählt von einem Spatzen zur Zeit der Pest.\nGiulia: Rund um den Platz arbeiten noch echte Handwerker: Restauratoren, Rahmenmacher, Lederhandwerker.\nLukas: Das Oltrarno war immer das Viertel der Handwerker. Viele Werkstätten gibt es hier schon seit Generationen.\nGiulia: Und hier gibt es eine sehr bekannte kleine Eisdiele. Wenn ihr Lust habt, probiert eine ungewöhnliche Sorte. Vertraut mir!\nLukas: Giulia isst jeden Tag ein Eis.\nGiulia: Natürlich! Ich bin Italienerin. Ein paar Schritte weiter kommt ihr auf die Via Guicciardini. Geht dort Richtung Ponte Vecchio."}, {"slug": "07-santa-felicita", "name": "Santa Felicita", "sub": "", "lat": 43.76715, "lng": 11.2524, "r": 25, "look": "Kleine Kirche mit Säulengang. Innen rechts: Pontormos Kreuzabnahme. Eine Münze fürs Licht bereithalten.", "vocab": [["der Säulengang", "portico"], ["sich unter das Volk mischen", "to mingle with ordinary people"], ["die Kreuzabnahme", "Deposition from the Cross"], ["zurückgezogen", "reclusive"], ["schweben", "to float"]], "dur": 72, "text": "Lukas: Bevor ihr die Brücke erreicht, seht ihr rechts eine kleine Kirche mit einem Säulengang: Santa Felicita.\nGiulia: Schaut nach oben, über den Eingang. Dort läuft der Vasari-Korridor vorbei, der private Gang der Medici. Er führt vom Palazzo Pitti bis zu den Uffizien.\nLukas: Und der Korridor hat ein Fenster ins Innere der Kirche. So konnten die Medici die Messe besuchen, ohne sich unter das Volk zu mischen.\nGiulia: Sehr praktisch. Und ein bisschen arrogant.\nLukas: Wenn die Kirche offen ist, geht hinein, gleich rechts in die erste Kapelle. Dort hängt eines der schönsten Bilder von Florenz: die Kreuzabnahme von Pontormo.\nGiulia: Diese Farben! Rosa, Hellblau, Orange, fast wie Bonbons. Die Figuren scheinen zu schweben. Man weiß gar nicht genau, wo sie eigentlich stehen.\nLukas: Pontormo hat das Bild um 1528 gemalt. Er war ein seltsamer Mensch und lebte sehr zurückgezogen. Aber was für ein Maler!\nGiulia: Oft braucht man eine Münze, um das Licht in der Kapelle einzuschalten. Haltet also eine bereit."}, {"slug": "08-ponte-vecchio", "name": "Ponte Vecchio", "sub": "", "lat": 43.768, "lng": 11.2531, "r": 35, "look": "Die älteste Brücke von Florenz. Goldschmiede statt Metzger, und oben der Vasari-Korridor.", "vocab": [["der Metzger", "butcher"], ["der Gerber", "tanner"], ["das Liebesschloss", "love padlock"], ["die Strafe", "fine, penalty"], ["kostenlos", "free of charge"]], "dur": 73, "text": "Giulia: Und jetzt: die Ponte Vecchio, die älteste Brücke von Florenz. Die heutige Brücke stammt aus dem Jahr 1345.\nLukas: Früher gab es hier Metzger und Gerber. Sie haben ihre Abfälle einfach in den Arno geworfen. Es hat schrecklich gerochen.\nGiulia: 1593 hatte Großherzog Ferdinando der Erste genug. Er hat die Metzger weggeschickt und Goldschmiede und Juweliere hierher geholt.\nLukas: Und die sind bis heute hier. In der Mitte der Brücke steht eine Büste von Benvenuto Cellini, dem berühmtesten Goldschmied von Florenz.\nGiulia: Ein wichtiger Hinweis für Verliebte: Bitte hängt hier kein Liebesschloss auf. Das ist verboten und kostet eine Strafe.\nLukas: Ein Kuss dagegen ist kostenlos.\nGiulia: Schaut noch einmal hinauf zum Vasari-Korridor über den Geschäften. Ihr seid heute fast denselben Weg gegangen wie die Medici. Nur unten, auf der Straße.\nLukas: Das war unser Spaziergang durch das Oltrarno. Vielen Dank, dass ihr mit uns gegangen seid!\nGiulia: Grazie mille, e buona serata! Genießt Florenz zu zweit."}];
+const ROUTE = [[43.76985, 11.25055], [43.76885, 11.24995], [43.7689, 11.2494], [43.76895, 11.2487], [43.7688, 11.2479], [43.7676, 11.2477], [43.7663, 11.2479], [43.7656, 11.2483], [43.765, 11.2489], [43.7654, 11.2501], [43.7661, 11.2506], [43.7668, 11.2511], [43.7669, 11.2519], [43.76715, 11.2524], [43.768, 11.2531], [43.7685, 11.25335]];
+STOPS.forEach((s, i) => { s.i = i; s.src = `audio/oltrarno-de/${s.slug}.mp3`; });
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+const audio = $("audio");
+let heard = new Set(store.get("olt-heard", [])), triggered = new Set(heard), queue = [], current = -1;
+let me = null, watchId = null, started = false, wakeLock = null, centered = false, follow = true;
+let rate = store.get("olt-rate", 1);
+
+const haversine = (a, b) => { const R = 6371000, t = d => d * Math.PI / 180, dLat = t(b.lat - a.lat), dLng = t(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(t(a.lat)) * Math.cos(t(b.lat)) * Math.sin(dLng / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const fmtDist = m => m < 1000 ? `${Math.round(m / 5) * 5} m` : `${(m / 1000).toFixed(1).replace(".", ",")} km`;
+const mins = m => Math.max(1, Math.round(m * 1.25 / 75));
+const fmtTime = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* Karte */
+const map = L.map("map", { zoomControl: false }).fitBounds(ROUTE, { padding: [30, 30] });
+L.control.zoom({ position: "topright" }).addTo(map);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+L.polyline(ROUTE, { color: "#a84d56", weight: 5, opacity: .55 }).addTo(map);
+const pins = STOPS.map(s => L.marker([s.lat, s.lng], { title: s.name }).addTo(map).on("click", () => playStop(s.i, true)));
+let meMarker = null, meCircle = null, toNext = null;
+function refreshPins() { STOPS.forEach((s, i) => pins[i].setIcon(L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 14], html: `<div class="pin ${i === current ? "now" : heard.has(i) ? "heard" : ""}">${i + 1}</div>` }))); }
+map.on("dragstart", () => { follow = false; $("locateBtn").classList.remove("follow"); });
+
+/* Liste */
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+function renderList() {
+  $("stops").innerHTML = STOPS.map(s => {
+    const d = me ? `<span class="d">${fmtDist(haversine(me, s))}</span> · ` : "";
+    const now = s.i === current && !audio.paused;
+    return `<li class="stop ${s.i === current ? "playing" : ""} ${heard.has(s.i) ? "heard" : ""}" id="stop-${s.i}">
+      <span class="num">${s.i + 1}</span>
+      <div style="min-width:0">
+        <h3>${esc(s.name)}${s.sub ? ` <span class="meta">· ${esc(s.sub)}</span>` : ""}</h3>
+        <div class="meta">${d}${fmtTime(s.dur)} · ${heard.has(s.i) ? "✓ gehört" : "startet bei Ankunft"}</div>
+        <p class="look">${esc(s.look)}</p>
+        <ul class="vocab" aria-label="Wortschatz">${s.vocab.map(([de, en]) => `<li><b>${esc(de)}</b> <i>${esc(en)}</i></li>`).join("")}</ul>
+        <details><summary>Mitlesen</summary><p>${esc(s.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${s.i}" aria-label="${now ? "Pause" : "Abspielen"}: ${esc(s.name)}">${now ? pauseSvg : playSvg}</button></li>`;
+  }).join("");
+  $("stops").querySelectorAll(".play").forEach(b => b.onclick = () => { const i = +b.dataset.i; if (i === current && !audio.paused) audio.pause(); else playStop(i, true); });
+}
+function nextStop() { const reached = Math.max(-1, current, ...triggered); return STOPS.find(s => s.i > reached && !triggered.has(s.i)) || null; }
+function renderNext() {
+  const n = nextStop();
+  if (!started) { $("next").hidden = true; return; }
+  $("next").hidden = false;
+  if (!n) { $("nextName").textContent = "Ihr habt alle Stationen gehört"; $("nextDist").textContent = "Genießt den Abend!"; if (toNext) { toNext.remove(); toNext = null; } return; }
+  $("nextName").textContent = `Nächste Station: ${n.i + 1}. ${n.name}`;
+  if (me) {
+    const d = haversine(me, n); $("nextDist").textContent = `${fmtDist(d)} · etwa ${mins(d)} Min. zu Fuß`;
+    const ll = [[me.lat, me.lng], [n.lat, n.lng]];
+    if (!toNext) toNext = L.polyline(ll, { color: "#1a73e8", weight: 3, dashArray: "4 8", opacity: .8 }).addTo(map); else toNext.setLatLngs(ll);
+  } else $("nextDist").textContent = "Warte auf GPS…";
+}
+
+/* Audio */
+function setPlayerUi() {
+  const s = STOPS[current];
+  $("pTitle").textContent = s ? `${s.i + 1}. ${s.name}` : (started ? "Weiter zur nächsten Station" : "Starten, dann zu Station 1 gehen");
+  $("ppIcon").innerHTML = audio.paused || !s ? '<path d="M7 4.5v15l13-7.5z"/>' : '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+  $("ppBtn").setAttribute("aria-label", audio.paused ? "Abspielen" : "Pause");
+}
+function playStop(i, user) {
+  const s = STOPS[i];
+  queue = queue.filter(q => q !== i); triggered.add(i); current = i;
+  audio.src = s.src; audio.playbackRate = rate;
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: "Giulia & Lukas", album: "Oltrarno zu zweit" });
+  audio.play().then(() => { $("banner").hidden = true; }).catch(() => { $("bannerTxt").textContent = `Ihr seid bei: ${s.name}.`; $("banner").hidden = false; });
+  if (user) map.panTo([s.lat, s.lng]);
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+}
+$("bannerBtn").onclick = () => { audio.play().catch(() => {}); $("banner").hidden = true; };
+$("ppBtn").onclick = () => { if (current < 0) { const n = nextStop() || STOPS[0]; playStop(n.i, true); return; } if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+audio.addEventListener("play", () => { audio.playbackRate = rate; setPlayerUi(); renderList(); });
+audio.addEventListener("pause", () => { setPlayerUi(); renderList(); });
+audio.addEventListener("timeupdate", () => { if (!audio.duration || current < 0) return; $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`; $("pCur").textContent = fmtTime(audio.currentTime); $("pDur").textContent = fmtTime(audio.duration); });
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  if (current >= 0) { heard.add(current); store.set("olt-heard", [...heard]); }
+  current = -1; $("pFill").style.width = "0"; $("pCur").textContent = "0:00"; $("pDur").textContent = "";
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+  if (queue.length) playStop(queue.shift(), false);
+});
+function renderSpeed() { document.querySelectorAll(".speed button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.r === rate)); }
+document.querySelectorAll(".speed button").forEach(b => b.onclick = () => { rate = +b.dataset.r; store.set("olt-rate", rate); audio.playbackRate = rate; renderSpeed(); });
+
+/* GPS */
+function onPos(pos) {
+  me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+  const ll = [me.lat, me.lng], hd = pos.coords.heading, moving = (pos.coords.speed || 0) > 0.4;
+  const cone = typeof hd === "number" && !isNaN(hd) && moving ? `<div class="me-cone" style="transform:rotate(${hd}deg)"></div>` : "";
+  const icon = L.divIcon({ className: "", html: `<div class="me-wrap">${cone}<div class="me-dot"></div></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+  if (!meMarker) {
+    meCircle = L.circle(ll, { radius: me.acc, color: "#1a73e8", weight: 1, fillOpacity: .1, interactive: false }).addTo(map);
+    meMarker = L.marker(ll, { icon, zIndexOffset: 1000, title: "Ihr seid hier" }).addTo(map);
+  } else { meMarker.setLatLng(ll).setIcon(icon); meCircle.setLatLng(ll).setRadius(me.acc); }
+  if (!centered) { map.setView(ll, 17); centered = true; } else if (follow) map.panTo(ll);
+  $("locateBtn").classList.add("on"); $("locateBtn").classList.toggle("follow", follow);
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = `Ihr · ±${Math.round(me.acc)} m`;
+  $("gpsMsg").textContent = `GPS an · Genauigkeit etwa ${Math.round(me.acc)} m`;
+  if (started && $("auto").checked) STOPS.forEach(s => {
+    if (triggered.has(s.i)) return;
+    if (haversine(me, s) <= s.r + Math.min(me.acc, 20)) {
+      triggered.add(s.i);
+      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      if (current < 0) playStop(s.i, false); else if (!queue.includes(s.i)) queue.push(s.i);
+    }
+  });
+  renderList(); renderNext();
+}
+function onErr(e) {
+  if (!me) { $("gpsChip").hidden = false; $("gpsChipTxt").textContent = e.code === 1 ? "Standort blockiert" : "Suche GPS…"; }
+  $("gpsMsg").textContent = e.code === 1 ? "Standort wurde verweigert. Erlaubt ihn in den Browser-Einstellungen und ladet neu. Ihr könnt jede Station auch mit ▶ abspielen." : "Suche noch GPS. Hohe Mauern stören manchmal.";
+  if (e.code === 1 && watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+function startGps() {
+  if (watchId !== null) return;
+  if (!("geolocation" in navigator)) { $("gpsMsg").textContent = "Dieser Browser kann keinen Standort teilen."; return; }
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = "Suche Standort…";
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+$("locateBtn").onclick = () => { startGps(); follow = true; $("locateBtn").classList.add("follow"); if (me) map.setView([me.lat, me.lng], Math.max(map.getZoom(), 17)); };
+try { navigator.permissions?.query({ name: "geolocation" }).then(st => { if (st.state === "granted") startGps(); }).catch(() => {}); } catch (e) {}
+async function keepAwake() { try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (started && document.visibilityState === "visible") keepAwake(); });
+
+$("startBtn").onclick = () => {
+  started = true;
+  audio.src = "audio/silence.mp3";   // Kurzer stummer Ton im Tipp, damit das Handy später automatisch abspielen darf.
+  audio.play().catch(() => {}).finally(() => { startGps(); if (me) onPos({ coords: { latitude: me.lat, longitude: me.lng, accuracy: me.acc } }); });
+  keepAwake();
+  $("startBtn").textContent = "Unterwegs ✓"; $("startBtn").disabled = true;
+  setPlayerUi(); renderNext();
+};
+$("resetBtn").onclick = () => { heard = new Set(); triggered = new Set(); queue = []; store.set("olt-heard", []); refreshPins(); renderList(); renderNext(); };
+renderSpeed(); refreshPins(); renderList(); setPlayerUi();
+</script>
+</body>
+</html>
