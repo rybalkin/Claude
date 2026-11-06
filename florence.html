@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
 <title>Florence on Foot</title>
 <meta name="description" content="A walking map of Florence for a first visit: three walks, why each place matters, and your live GPS position.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,18 +25,7 @@
     --chip: #eeebe3;
     --display: "Marcellus", "Trajan Pro", Georgia, serif;
     --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #121715; --panel: #1a201e; --ink: #ebe8e1; --muted: #9ca8a2; --line: #2b3431;
-      --w1: #6db89b; --w2: #e1929a; --w3: #d8ad55; --me: #5ea2ff; --chip: #232b28;
-      color-scheme: dark;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #121715; --panel: #1a201e; --ink: #ebe8e1; --muted: #9ca8a2; --line: #2b3431;
-    --w1: #6db89b; --w2: #e1929a; --w3: #d8ad55; --me: #5ea2ff; --chip: #232b28;
-    color-scheme: dark;
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -151,7 +141,6 @@
   .leaflet-popup-content p { margin: 0 0 8px; }
   .leaflet-container a.btn { color: var(--ink); }
   .leaflet-control-attribution { font-size: 10px; }
-  .dark-tiles .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7); }
   .wrap-map { position: relative; }
   @media (max-width: 860px) { .wrap-map { position: sticky; top: 0; z-index: 1; } }
 </style>
@@ -310,15 +299,11 @@ PLACES.forEach((p, i) => { p.idx = i; p.n = PLACES.filter((q, j) => q.walk === p
 /* ---------- map ---------- */
 const map = L.map("map", { zoomControl: false, attributionControl: true }).setView([43.7700, 11.2560], 15);
 L.control.zoom({ position: "topright" }).addTo(map);
-const dark = window.matchMedia("(prefers-color-scheme: dark)");
-const isDark = () => document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && dark.matches);
-// OpenStreetMap tiles need no API key. Dark mode tints the same tiles with a CSS filter.
+// OpenStreetMap tiles need no API key. The page always uses its light theme.
 const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
-const tintTiles = () => document.getElementById("map").classList.toggle("dark-tiles", isDark());
-tintTiles();
 
 const markers = [];
 const lines = {};
@@ -497,11 +482,6 @@ $("locateBtn").onclick = startGps;
 try {
   navigator.permissions?.query({ name: "geolocation" }).then(s => { if (s.state === "granted") startGps(); }).catch(() => {});
 } catch (e) {}
-
-/* ---------- theme ---------- */
-function onTheme() { tintTiles(); drawMap(); if (meCircle) meCircle.setStyle({ color: css("--me") }); }
-dark.addEventListener?.("change", onTheme);
-new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
 drawMap();
 renderAll(false);
