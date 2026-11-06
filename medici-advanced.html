@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Gold, Blood &amp; Genius · Advanced</title>
+<meta name="description" content="A seven-episode walking podcast about the Medici, from the first bank in 1397 to the last Medici in 1743.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a museum audio-guide handset. Number keys on top, tracks grouped by floor, a docked player.
+     Same marble palette as Florence on Foot; the gold accent stands for the gold-ground altarpieces. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --green: #2f6b57;
+    --gold: #9a6d14;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: max(20px, env(safe-area-inset-top, 0px)) 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+  .back { color: var(--green); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1.1; margin: 2px 0 6px; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 400; font-size: 1.35rem; margin: 6px 0 0; }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible, .track:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+  .offline { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--chip); border-radius: 14px; padding: 12px 14px; }
+  .offline p { margin: 0; flex: 1 1 220px; min-width: 0; font-size: .92rem; }
+  .offline.done { background: color-mix(in srgb, var(--green) 12%, var(--panel)); }
+
+  .keys { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .keys button { padding: 0; height: 48px; border-radius: 12px; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .keys button.heard { color: var(--muted); background: var(--chip); }
+  .keys button.now { background: var(--green); border-color: var(--green); color: #fff; }
+
+  ol.tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .track { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: start; scroll-margin-top: 16px; scroll-margin-bottom: 140px; }
+  .track.now { border-color: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 25%, transparent); }
+  .no { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--ink); color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track.heard .no { background: var(--muted); }
+  .track.now .no { background: var(--green); }
+  .track h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track p.look { margin: 6px 0 0; font-size: .93rem; }
+  .track details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .track summary { cursor: pointer; font-weight: 600; color: var(--green); }
+  .track details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .player .row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; align-items: center; }
+  .ctrls { display: flex; gap: 6px; align-items: center; }
+  .ctrls button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); }
+  .ctrls .pp { width: 52px; height: 52px; background: var(--green); color: #fff; }
+  .ctrls svg { width: 18px; height: 18px; } .ctrls .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--green); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .time label { display: inline-flex; gap: 6px; align-items: center; }
+  .time input { width: 16px; height: 16px; accent-color: var(--green); margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <a class="back" href="medici.html" style="float:right">Standard English</a>
+    <div class="eyebrow" style="margin-top:10px">A walking podcast · 7 episodes · advanced English</div>
+    <h1>Gold, Blood &amp; Genius</h1>
+    <p class="lede">The Medici, from a banker's counter in 1397 to the last of the family in 1743: a pirate pope, a murder at Mass, a bonfire, two popes, a queen of France and the woman who saved it all. Giulia and James tell it in seven short episodes, about 8 minutes in all. Press play and walk anywhere.</p>
+  </header>
+
+  <div class="offline" id="offline">
+    <p id="offTxt"><b>Walking somewhere quiet?</b> Save all tracks to this phone now (6 MB) so they play without internet.</p>
+    <button type="button" id="offBtn">⬇ Save for offline</button>
+  </div>
+
+  <section>
+    <div class="eyebrow" style="margin-bottom:8px">Episodes</div>
+    <div class="keys" id="keys" role="group" aria-label="Track numbers"></div>
+  </section>
+
+  <div id="list"></div>
+
+  <p class="fine">Voices and sound made with ElevenLabs. Where the sources disagree or a story is a legend, the hosts say so. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <div class="row">
+      <div class="ctrls">
+        <button type="button" id="prevBtn" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button type="button" class="pp" id="ppBtn" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+        <button type="button" id="nextBtn" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      </div>
+      <div style="min-width:0">
+        <div class="t" id="pTitle">1 · A Bank, a Schism and a Pirate Pope</div>
+        <div class="meta" id="pFloor">Press play and start walking</div>
+      </div>
+    </div>
+    <div class="bar" id="pBar"><i id="pFill"></i></div>
+    <div class="time"><span id="pCur">0:00</span><label><input type="checkbox" id="auto"> Play next episode automatically</label><span id="pDur"></span></div>
+  </div>
+</div>
+<audio id="audio" preload="none"></audio>
+
+<script>
+const TRACKS = [{"slug": "01-bankers", "title": "A Bank, a Schism and a Pirate Pope", "floor": "Episodes", "look": "1397–1429 · How a cautious money-changer staked everything on a disgraced pope and built a multinational before the word existed.", "n": 1, "dur": 261, "text": "James: Florence, 1397. Half a century after the Black Death carried off perhaps half its people, the city is rich again, restless, and fiercely proud. Its cathedral stands unfinished, open to the sky where a dome ought to be.\nGiulia: And in a modest house near the old market, a cautious, rather unremarkable banker founds a new partnership. Giovanni di Bicci de' Medici. He cannot possibly know that his descendants will dominate this city, intermittently, for three and a half centuries.\nJames: Welcome to Gold, Blood and Genius. I'm James.\nGiulia: And I'm Giulia. Over the next twenty minutes, while you wander, we'll trace how a family of money-changers came to rival the crowned heads of Europe, and how, in the end, the line simply ran out.\nJames: Episode one: A Bank, a Schism and a Pirate Pope. Let's begin with the name. Medici means physicians, which has encouraged a rather charming theory that the family started out as apothecaries, and that the red balls on their coat of arms were, in fact, pills.\nGiulia: An appealing story, and almost certainly apocryphal. Coins are the likelier explanation, but frankly, nobody knows. What's beyond dispute is that the palle are everywhere: carved over church doors, on palace corners, even on drainpipes. Once you've noticed them, the city never looks quite the same.\nJames: To understand the Medici, you have to grasp the peculiar machinery of the Florentine republic. There was no prince. Power belonged, at least nominally, to the guilds, and every two months the names of eligible citizens were drawn from leather bags to form a new government.\nGiulia: A system designed precisely to stop any one family from accumulating too much power. In theory.\nJames: In theory. Giovanni's stroke of genius was to cultivate the most lucrative client in Christendom: the papacy. Church revenues flowed in from every corner of Europe, and someone had to collect, transfer and, crucially, lend them.\nGiulia: Except that, in those years, the Church was in schism. At one point there were three rival popes, each denouncing the others as impostors.\nJames: An awkward moment for the faithful, and a perilous one for bankers.\nGiulia: Giovanni staked his fortune on Baldassarre Cossa, a Neapolitan cleric widely rumoured to have been a pirate in his youth. When the Council of Constance deposed Cossa in 1415 and imprisoned him, it was the Medici who eventually paid his ransom.\nJames: And when he died, they commissioned Donatello and Michelozzo to build him a sumptuous tomb in the Baptistery. It still stands there, much to the irritation of later popes.\nGiulia: Such loyalty did not go unnoticed. The Medici became bankers to the papal court, and over the following decades their branches spread to Venice, Geneva, Bruges, London and beyond: a genuinely international enterprise, centuries before the word existed.\nJames: Bills of exchange allowed a wool merchant in London to deposit funds and draw them in Florence, without ever risking a strongbox on bandit-infested roads.\nGiulia: Yet Giovanni cultivated a studied modesty. He dressed plainly, avoided public office wherever he could, and channelled his wealth into conspicuous gifts to the city, such as the Old Sacristy of San Lorenzo, entrusted to a brilliant young architect named Filippo Brunelleschi.\nJames: On his deathbed in 1429, his counsel to his sons was essentially this: keep out of the limelight, go to the Palazzo only when summoned, and keep the people content.\nGiulia: His elder son took that advice... selectively. Within four years, Cosimo de' Medici would find himself locked in a tower, convinced that his supper had been poisoned.\nJames: Next time: Cosimo, the godfather."}, {"slug": "02-godfather", "title": "King in All but Name", "floor": "Episodes", "look": "1429–1464 · Arrest, exile and a triumphant return: Cosimo rules by stealth and bankrolls the early Renaissance.", "n": 2, "dur": 247, "text": "James: September 1433. Cosimo de' Medici is summoned to the Palazzo Vecchio. He crosses the threshold, and the doors close behind him.\nGiulia: He is arrested on the spot. His rivals, an oligarchic faction led by Rinaldo degli Albizzi, have watched the Medici fortune swell with mounting alarm, and they accuse Cosimo of plotting to raise himself above the republic.\nJames: They confine him to a cramped cell high in the tower, which Florentines, with characteristic irony, nicknamed the Alberghetto: the little inn.\nGiulia: Hardly a five-star establishment.\nJames: Fearing poison, Cosimo barely touches his food for days, while his enemies press for his execution.\nGiulia: But Cosimo commands something they lack: limitless credit, and a web of obligation reaching into every corner of the city. A few discreet payments, so the story goes, softened the hardest hearts, and death was commuted to ten years of exile in the north.\nJames: Venice received him with honours befitting a sovereign. Florence, meanwhile, discovered to its dismay that capital had followed him out of the gates. Within a year the political wind had shifted, a friendly government emerged from the bags, and in 1434 Cosimo was recalled.\nGiulia: He returned in triumph. It was the Albizzi who were banished, and they never set foot in Florence again.\nJames: What followed was a masterclass in power exercised by stealth. Cosimo took no title, wore no crown, and left the institutions of the republic outwardly intact...\nGiulia: ...while ensuring that the bags of names were filled with reliable friends. Pope Pius the Second observed, rather drily, that Cosimo was king in all but name.\nJames: And yet history remembers him less as a political operator than as a patron of almost bewildering generosity.\nGiulia: He financed the rebuilding of San Lorenzo, and of the convent of San Marco, where Fra Angelico painted a fresco in every friar's cell: an aid to contemplation, not mere decoration.\nJames: He was Donatello's protector and friend. When he presented the sculptor with an elegant red cloak, Donatello wore it once or twice, then handed it back, declaring it far too fine for the likes of him.\nGiulia: And when Brunelleschi submitted a magnificent design for the family palace, Cosimo rejected it as too ostentatious. Envy, he is supposed to have said, is a weed that should never be watered.\nJames: Then, in 1439, came a spectacle Florence would never forget: the Council of Florence. The pope, the Byzantine emperor and a retinue of Greek prelates and scholars descended on the city, hoping to heal a rift of four centuries between the Latin and Orthodox churches.\nGiulia: Picture the streets thronged with bearded patriarchs in extravagant headgear. Painters sketched them eagerly, and you can still glimpse their exotic silhouettes in Benozzo Gozzoli's frescoes in the chapel of the Medici palace.\nJames: The union proved short-lived. But the Greeks left a far more enduring legacy: Plato, in the original.\nGiulia: Cosimo was so captivated that he gave a villa to a precocious young scholar, Marsilio Ficino, and commissioned him to translate the complete works of Plato into Latin: the seed of the so-called Platonic Academy.\nJames: When Cosimo died in 1464, the city inscribed his tomb with two words: Pater Patriae. Father of his country.\nGiulia: His son Piero, crippled by gout, governed for a mere five years. Power then passed to a twenty-year-old: brilliant, magnetic, conspicuously plain, and a gifted poet. Lorenzo.\nJames: Next time: murder beneath the dome."}];
+const CACHE = "medici-advanced-v1";
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+const url = t => `audio/medici-advanced/${t.slug}.mp3`;
+const num = i => String(TRACKS[i].n);
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let heard = new Set(store.get("medici-adv-heard", []));
+let current = store.get("medici-adv-current", 0);
+let blobUrl = null, wakeLock = null;
+$("auto").checked = store.get("medici-adv-auto", true);
+$("auto").onchange = () => store.set("gallery-auto", $("auto").checked);
+
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+function render() {
+  const playing = !audio.paused;
+  $("keys").innerHTML = TRACKS.map((t, i) => `<button type="button" data-i="${i}" class="${i === current && audio.src ? "now" : heard.has(i) ? "heard" : ""}" aria-label="Episode ${t.n}: ${esc(t.title)}">${num(i)}</button>`).join("");
+  let html = "", floor = null;
+  TRACKS.forEach((t, i) => {
+    if (false) { if (floor !== null) html += "</ol>"; floor = t.floor; html += `<h2>${esc(floor)}</h2><ol class="tracks">`; }
+    const now = i === current && audio.src;
+    html += (i === 0 ? '<ol class="tracks">' : "") + `<li class="track ${now ? "now" : ""} ${heard.has(i) ? "heard" : ""}" id="t-${i}">
+      <span class="no">${num(i)}</span>
+      <div style="min-width:0">
+        <h3>${esc(t.title)}</h3>
+        <div class="meta">${fmt(t.dur)}${heard.has(i) ? " · ✓ heard" : ""}</div>
+        <p class="look">${esc(t.look)}</p>
+        <details><summary>Read along</summary><p>${esc(t.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${i}" aria-label="${now && playing ? "Pause" : "Play"} track ${i}">${now && playing ? pauseSvg : playSvg}</button></li>`;
+  });
+  $("list").innerHTML = html + "</ol>";
+  document.querySelectorAll("#keys button, .track .play").forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (i === current && audio.src && !audio.paused) audio.pause(); else play(i, b.closest("#keys") !== null);
+  });
+  const t = TRACKS[current];
+  $("pTitle").textContent = `${num(current)} · ${t.title}`;
+  $("pFloor").textContent = audio.src ? t.floor : "Press play and start walking";
+  $("ppIcon").innerHTML = playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l13-7.5z"/>';
+  $("ppBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
+  $("prevBtn").disabled = current === 0; $("nextBtn").disabled = current === TRACKS.length - 1;
+}
+
+async function sourceFor(t) {
+  // Use the copy saved on the phone when there is one, so tracks play without signal.
+  try {
+    if ("caches" in window) {
+      const hit = await (await caches.open(CACHE)).match(url(t));
+      if (hit) { if (blobUrl) URL.revokeObjectURL(blobUrl); blobUrl = URL.createObjectURL(await hit.blob()); return blobUrl; }
+    }
+  } catch (e) {}
+  return url(t);
+}
+async function play(i, scroll) {
+  current = i; store.set("medici-adv-current", i);
+  const t = TRACKS[i];
+  audio.src = await sourceFor(t);
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: `${num(i)} · ${t.title}`, artist: "Giulia & James", album: "Gold, Blood & Genius" });
+  audio.play().catch(() => {});
+  keepAwake();
+  render();
+  if (scroll) $("t-" + i).scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("ppBtn").onclick = () => { if (!audio.src) play(current, true); else if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+$("prevBtn").onclick = () => { if (current > 0) play(current - 1, true); };
+$("nextBtn").onclick = () => { if (current < TRACKS.length - 1) play(current + 1, true); };
+if ("mediaSession" in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler("previoustrack", () => $("prevBtn").onclick());
+    navigator.mediaSession.setActionHandler("nexttrack", () => $("nextBtn").onclick());
+  } catch (e) {}
+}
+audio.addEventListener("play", render);
+audio.addEventListener("pause", render);
+audio.addEventListener("timeupdate", () => {
+  if (!audio.duration) return;
+  $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`;
+  $("pCur").textContent = fmt(audio.currentTime); $("pDur").textContent = fmt(audio.duration);
+});
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  heard.add(current); store.set("medici-adv-heard", [...heard]);
+  if ($("auto").checked && current < TRACKS.length - 1) play(current + 1, true);
+  else { $("pFill").style.width = "100%"; render(); }
+});
+async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); } } catch (e) {} }
+$("resetBtn").onclick = () => { heard = new Set(); store.set("medici-adv-heard", []); render(); };
+
+/* ---------- offline ---------- */
+async function checkOffline() {
+  try {
+    if (!("caches" in window)) { $("offline").hidden = true; return; }
+    const c = await caches.open(CACHE); const keys = await c.keys();
+    if (keys.length >= TRACKS.length) { $("offline").classList.add("done"); $("offTxt").innerHTML = "<b>✓ Saved on this phone.</b> All episodes play without internet."; $("offBtn").hidden = true; }
+  } catch (e) { $("offline").hidden = true; }
+}
+$("offBtn").onclick = async () => {
+  $("offBtn").disabled = true;
+  try {
+    const c = await caches.open(CACHE); let done = 0;
+    for (const t of TRACKS) {
+      if (!(await c.match(url(t)))) { const r = await fetch(url(t)); if (!r.ok) throw new Error(r.status); await c.put(url(t), r); }
+      done++; $("offBtn").textContent = `Saving… ${done}/${TRACKS.length}`;
+    }
+    checkOffline();
+  } catch (e) {
+    $("offBtn").disabled = false; $("offBtn").textContent = "⬇ Try again";
+    $("offTxt").innerHTML = "<b>Saving stopped.</b> The connection dropped. Tap Try again; tracks already saved are kept.";
+  }
+};
+checkOffline();
+render();
+</script>
+</body>
+</html>
