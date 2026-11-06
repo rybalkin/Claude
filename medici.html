@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Gold, Blood &amp; Genius</title>
+<meta name="description" content="A seven-episode walking podcast about the Medici, from the first bank in 1397 to the last Medici in 1743.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a museum audio-guide handset. Number keys on top, tracks grouped by floor, a docked player.
+     Same marble palette as Florence on Foot; the gold accent stands for the gold-ground altarpieces. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --green: #2f6b57;
+    --gold: #9a6d14;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: max(20px, env(safe-area-inset-top, 0px)) 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+  .back { color: var(--green); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1.1; margin: 2px 0 6px; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 400; font-size: 1.35rem; margin: 6px 0 0; }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible, .track:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+  .offline { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--chip); border-radius: 14px; padding: 12px 14px; }
+  .offline p { margin: 0; flex: 1 1 220px; min-width: 0; font-size: .92rem; }
+  .offline.done { background: color-mix(in srgb, var(--green) 12%, var(--panel)); }
+
+  .keys { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .keys button { padding: 0; height: 48px; border-radius: 12px; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .keys button.heard { color: var(--muted); background: var(--chip); }
+  .keys button.now { background: var(--green); border-color: var(--green); color: #fff; }
+
+  ol.tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .track { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: start; scroll-margin-top: 16px; scroll-margin-bottom: 140px; }
+  .track.now { border-color: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 25%, transparent); }
+  .no { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--ink); color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track.heard .no { background: var(--muted); }
+  .track.now .no { background: var(--green); }
+  .track h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track p.look { margin: 6px 0 0; font-size: .93rem; }
+  .track details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .track summary { cursor: pointer; font-weight: 600; color: var(--green); }
+  .track details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .player .row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; align-items: center; }
+  .ctrls { display: flex; gap: 6px; align-items: center; }
+  .ctrls button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); }
+  .ctrls .pp { width: 52px; height: 52px; background: var(--green); color: #fff; }
+  .ctrls svg { width: 18px; height: 18px; } .ctrls .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--green); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .time label { display: inline-flex; gap: 6px; align-items: center; }
+  .time input { width: 16px; height: 16px; accent-color: var(--green); margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <div class="eyebrow" style="margin-top:10px">A walking podcast · 7 episodes</div>
+    <h1>Gold, Blood &amp; Genius</h1>
+    <p class="lede">The Medici, from a banker's counter in 1397 to the last of the family in 1743: a pirate pope, a murder at Mass, a bonfire, two popes, a queen of France and the woman who saved it all. Giulia and James tell it in seven short episodes, about 11 minutes in all. Press play and walk anywhere.</p>
+  </header>
+
+  <div class="offline" id="offline">
+    <p id="offTxt"><b>Walking somewhere quiet?</b> Save all tracks to this phone now (8 MB) so they play without internet.</p>
+    <button type="button" id="offBtn">⬇ Save for offline</button>
+  </div>
+
+  <section>
+    <div class="eyebrow" style="margin-bottom:8px">Episodes</div>
+    <div class="keys" id="keys" role="group" aria-label="Track numbers"></div>
+  </section>
+
+  <div id="list"></div>
+
+  <p class="fine">Voices and sound made with ElevenLabs. Where the sources disagree or a story is a legend, the hosts say so. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <div class="row">
+      <div class="ctrls">
+        <button type="button" id="prevBtn" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button type="button" class="pp" id="ppBtn" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+        <button type="button" id="nextBtn" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      </div>
+      <div style="min-width:0">
+        <div class="t" id="pTitle">1 · The Bankers</div>
+        <div class="meta" id="pFloor">Press play and start walking</div>
+      </div>
+    </div>
+    <div class="bar" id="pBar"><i id="pFill"></i></div>
+    <div class="time"><span id="pCur">0:00</span><label><input type="checkbox" id="auto"> Play next episode automatically</label><span id="pDur"></span></div>
+  </div>
+</div>
+<audio id="audio" preload="none"></audio>
+
+<script>
+const TRACKS = [{"slug": "01-bankers", "title": "The Bankers", "floor": "Episodes", "look": "1397–1429 · How a modest banker bet on a pirate pope and built a medieval multinational.", "n": 1, "dur": 220, "text": "James: Florence, 1397. A city still recovering from the Black Death. Its cathedral is still unfinished, with no dome at all.\nGiulia: And in a modest house near the old market, a banker opens a new company. His name is Giovanni di Bicci de' Medici. Nobody knows it yet, but his family will rule this city, on and off, for three hundred and forty years.\nJames: Welcome to Gold, Blood and Genius, the story of the Medici. I'm James.\nGiulia: And I'm Giulia. For the next twenty minutes, while you walk, we'll tell you how a family of bankers became one of the most powerful families in Europe. And how it all ended.\nJames: Episode one: The Bankers. So, first question. Where does the name Medici come from?\nGiulia: Medici means doctors. Some people think the family started out as apothecaries, and that the red balls on their coat of arms were pills.\nJames: Pills!\nGiulia: Others say they're coins. Nobody really knows. But you'll see those balls, the palle, all over Florence: on churches, on palaces, even on drainpipes. Once you notice them, you can't stop.\nJames: Now, Florence in 1400 is a republic. No king, no duke. It's run by the guilds: wool merchants, silk merchants, bankers. Every two months, names are drawn out of leather bags to choose a new government.\nGiulia: Two months! So nobody could stay in power for long. In theory.\nJames: In theory. Giovanni's genius was to bank for the biggest client in the world: the Church. The pope collected money from all over Europe, and somebody had to move it, store it, and lend it.\nGiulia: And he made a risky bet. In those years there wasn't one pope. There were three, all claiming to be the real one.\nJames: A confusing time to be a Catholic.\nGiulia: Giovanni backed one of them, Baldassarre Cossa. A former pirate, people whispered. When a great Church council deposed Cossa in 1415 and threw him in prison, who paid his ransom?\nJames: The Medici. And when he died, they gave him a magnificent tomb by Donatello, in the Baptistery. It's still there.\nGiulia: Loyalty. That was the Medici brand. The popes that came after noticed, and the Medici became the papal bankers. Over the next decades they opened branches in Rome, Venice, Geneva, Bruges, London, Milan.\nJames: A medieval multinational. A merchant could deposit money in London and collect it in Florence with a letter of credit. No heavy chests of gold on dangerous roads.\nGiulia: And here's the clever part. Giovanni stayed humble. Simple clothes, no grand titles. He paid for things the city could see, like the Old Sacristy of San Lorenzo, by a young architect called Brunelleschi.\nJames: When he died in 1429, his advice to his sons was, more or less: stay out of the spotlight. Don't go to the government palace unless you're called. Keep the people happy.\nGiulia: His elder son listened. Partly. And that son is the man who really made the Medici. His name was Cosimo. And within four years, he'd be locked in a tower, waiting to be poisoned.\nJames: Next: Cosimo, the godfather."}, {"slug": "05-bonfire", "title": "The Bonfire", "floor": "Episodes", "look": "1492–1513 · The Medici are thrown out, Savonarola burns the vanities, Michelangelo's David rises, and Machiavelli writes The Prince.", "n": 5, "dur": 215, "text": "Giulia: Lorenzo's son Piero was twenty. Proud, more interested in sport and horses than politics. History calls him Piero the Unfortunate.\nJames: In 1494, King Charles the Eighth of France marched into Italy with a huge army. Piero panicked. He rode to the French camp and handed over Florence's fortresses without asking anyone.\nGiulia: When he came home, the doors of the Palazzo Vecchio were shut in his face. The crowd turned on him, and the Medici fled the city. Their palace was looted.\nJames: Into the gap stepped Savonarola. He had preached that a scourge would come over the mountains to punish Italy. And then the French came. People thought he was a prophet.\nGiulia: For four years the friar was the moral ruler of Florence. Bands of boys went from house to house collecting vanities: mirrors, perfumes, fine clothes, playing cards, musical instruments, books of poetry, paintings.\nJames: And on the seventh of February, 1497, Carnival, they piled everything into a huge pyramid in Piazza della Signoria and set it on fire. The Bonfire of the Vanities.\nGiulia: Some say Botticelli, by then a follower of Savonarola, threw some of his own paintings into the flames.\nJames: But Florentines got tired of being saints. And the pope, Alexander the Sixth, the famous Borgia pope, excommunicated Savonarola.\nGiulia: A Borgia, lecturing someone else about morals.\nJames: In 1498, a rival friar challenged Savonarola to a trial by fire. Walk through the flames, and God would protect the true prophet. A huge crowd gathered. The two sides argued about the rules for hours... and then it rained.\nGiulia: Nobody walked through anything. The crowd felt cheated. The next day they stormed San Marco. Savonarola was arrested and tortured, and on the twenty-third of May, 1498, he was hanged and burned in the same square as his bonfire.\nJames: Remember the round plaque in the pavement near the Neptune fountain? That's the spot.\nGiulia: Florence became a real republic again, with a sharp young civil servant as its secretary: Niccolò Machiavelli. He organized a citizen militia, and travelled as a diplomat, watching powerful men very closely.\nJames: In 1504 the republic placed Michelangelo's David in front of the Palazzo Vecchio. A young hero facing a giant. Everyone knew who the giants were.\nGiulia: But in 1512, the giants came back. Spanish troops, allied with the pope, sacked the nearby town of Prato. Florence surrendered, and the Medici returned, led by Lorenzo's son, Cardinal Giovanni.\nJames: And Machiavelli? Accused of plotting, he was tortured with the rope: hands tied behind his back, lifted up and dropped. Six times. He confessed nothing.\nGiulia: Released, he retired to his farm. In the evenings, he wrote a little book about how to win power and keep it. The Prince. And he dedicated it to a Medici.\nJames: A job application, some say. Next episode: two Medici popes, a revolution in Germany, and a Medici queen of France."}, {"slug": "06-popes", "title": "Popes and a Queen", "floor": "Episodes", "look": "1513–1537 · Leo X and Luther, the Sack of Rome, the last siege of the republic, a murdered duke and Catherine, Queen of France.", "n": 6, "dur": 197, "text": "Giulia: March 1513. In Rome, the cardinals elect a new pope. He's thirty-seven, round, cheerful, short-sighted, and he loves music, hunting and theatre. Giovanni de' Medici. Lorenzo's son.\nJames: He becomes Pope Leo the Tenth. And according to a famous story, he said: God has given us the papacy. Let us enjoy it.\nGiulia: And he did! Raphael painted for him. He spent fortunes on feasts and on the new Saint Peter's. He even had a white elephant, a gift from the King of Portugal, called Hanno.\nJames: Of course he did. But to pay for Saint Peter's, the Church sold more and more indulgences: pay, and your sins are forgiven.\nGiulia: And in 1517, in a small German town called Wittenberg, a monk named Martin Luther published ninety-five theses against exactly that. The Reformation began under a Medici pope.\nJames: Leo died in 1521. And two years later, another Medici became pope. Giulio, the son of Giuliano, the brother murdered in the cathedral. He was born a month after his father's death, and Lorenzo raised him.\nGiulia: He became Clement the Seventh. And he was much less lucky. He played France against the Emperor Charles the Fifth, and lost. In 1527 the Emperor's unpaid soldiers sacked Rome, while the pope hid in Castel Sant'Angelo.\nJames: In Florence, people saw their chance and threw the Medici out once more. The last republic. And Michelangelo, of all people, designed the city's defences, against the family that had raised him.\nGiulia: But the pope and the emperor made peace, and their army besieged Florence for ten months. In August 1530, Florence surrendered. Michelangelo went into hiding. Some believe in a small room under the Medici Chapels, where charcoal drawings were discovered on the walls in 1975.\nJames: This time the Medici came back for good. Not as first citizens, but as dukes. Alessandro de' Medici became the first Duke of Florence in 1532.\nGiulia: Alessandro was cruel and hated. In January 1537, his own cousin Lorenzino lured him to his house, promising a secret night with a beautiful lady...\nJames: ...and murdered him instead. Lorenzino called himself the new Brutus. But nobody rose up. He fled, and was killed years later in Venice.\nGiulia: Meanwhile, in 1533, the pope had arranged a marriage for a fourteen-year-old orphan of the family: Catherine de' Medici. Her husband: Henry, son of the King of France.\nJames: Catherine became Queen of France, and later the mother of three French kings. Legend says she brought Florentine cooks, forks and even sorbet to the French court.\nGiulia: French chefs will deny it. But it's a good story.\nJames: Next, our last episode: grand dukes, Galileo's moons, and the last of the Medici."}];
+const CACHE = "medici-podcast-v1";
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+const url = t => `audio/medici/${t.slug}.mp3`;
+const num = i => String(TRACKS[i].n);
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let heard = new Set(store.get("medici-heard", []));
+let current = store.get("medici-current", 0);
+let blobUrl = null, wakeLock = null;
+$("auto").checked = store.get("medici-auto", true);
+$("auto").onchange = () => store.set("gallery-auto", $("auto").checked);
+
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+function render() {
+  const playing = !audio.paused;
+  $("keys").innerHTML = TRACKS.map((t, i) => `<button type="button" data-i="${i}" class="${i === current && audio.src ? "now" : heard.has(i) ? "heard" : ""}" aria-label="Episode ${t.n}: ${esc(t.title)}">${num(i)}</button>`).join("");
+  let html = "", floor = null;
+  TRACKS.forEach((t, i) => {
+    if (false) { if (floor !== null) html += "</ol>"; floor = t.floor; html += `<h2>${esc(floor)}</h2><ol class="tracks">`; }
+    const now = i === current && audio.src;
+    html += (i === 0 ? '<ol class="tracks">' : "") + `<li class="track ${now ? "now" : ""} ${heard.has(i) ? "heard" : ""}" id="t-${i}">
+      <span class="no">${num(i)}</span>
+      <div style="min-width:0">
+        <h3>${esc(t.title)}</h3>
+        <div class="meta">${fmt(t.dur)}${heard.has(i) ? " · ✓ heard" : ""}</div>
+        <p class="look">${esc(t.look)}</p>
+        <details><summary>Read along</summary><p>${esc(t.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${i}" aria-label="${now && playing ? "Pause" : "Play"} track ${i}">${now && playing ? pauseSvg : playSvg}</button></li>`;
+  });
+  $("list").innerHTML = html + "</ol>";
+  document.querySelectorAll("#keys button, .track .play").forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (i === current && audio.src && !audio.paused) audio.pause(); else play(i, b.closest("#keys") !== null);
+  });
+  const t = TRACKS[current];
+  $("pTitle").textContent = `${num(current)} · ${t.title}`;
+  $("pFloor").textContent = audio.src ? t.floor : "Press play and start walking";
+  $("ppIcon").innerHTML = playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l13-7.5z"/>';
+  $("ppBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
+  $("prevBtn").disabled = current === 0; $("nextBtn").disabled = current === TRACKS.length - 1;
+}
+
+async function sourceFor(t) {
+  // Use the copy saved on the phone when there is one, so tracks play without signal.
+  try {
+    if ("caches" in window) {
+      const hit = await (await caches.open(CACHE)).match(url(t));
+      if (hit) { if (blobUrl) URL.revokeObjectURL(blobUrl); blobUrl = URL.createObjectURL(await hit.blob()); return blobUrl; }
+    }
+  } catch (e) {}
+  return url(t);
+}
+async function play(i, scroll) {
+  current = i; store.set("medici-current", i);
+  const t = TRACKS[i];
+  audio.src = await sourceFor(t);
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: `${num(i)} · ${t.title}`, artist: "Giulia & James", album: "Gold, Blood & Genius" });
+  audio.play().catch(() => {});
+  keepAwake();
+  render();
+  if (scroll) $("t-" + i).scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("ppBtn").onclick = () => { if (!audio.src) play(current, true); else if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+$("prevBtn").onclick = () => { if (current > 0) play(current - 1, true); };
+$("nextBtn").onclick = () => { if (current < TRACKS.length - 1) play(current + 1, true); };
+if ("mediaSession" in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler("previoustrack", () => $("prevBtn").onclick());
+    navigator.mediaSession.setActionHandler("nexttrack", () => $("nextBtn").onclick());
+  } catch (e) {}
+}
+audio.addEventListener("play", render);
+audio.addEventListener("pause", render);
+audio.addEventListener("timeupdate", () => {
+  if (!audio.duration) return;
+  $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`;
+  $("pCur").textContent = fmt(audio.currentTime); $("pDur").textContent = fmt(audio.duration);
+});
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  heard.add(current); store.set("medici-heard", [...heard]);
+  if ($("auto").checked && current < TRACKS.length - 1) play(current + 1, true);
+  else { $("pFill").style.width = "100%"; render(); }
+});
+async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); } } catch (e) {} }
+$("resetBtn").onclick = () => { heard = new Set(); store.set("medici-heard", []); render(); };
+
+/* ---------- offline ---------- */
+async function checkOffline() {
+  try {
+    if (!("caches" in window)) { $("offline").hidden = true; return; }
+    const c = await caches.open(CACHE); const keys = await c.keys();
+    if (keys.length >= TRACKS.length) { $("offline").classList.add("done"); $("offTxt").innerHTML = "<b>✓ Saved on this phone.</b> All episodes play without internet."; $("offBtn").hidden = true; }
+  } catch (e) { $("offline").hidden = true; }
+}
+$("offBtn").onclick = async () => {
+  $("offBtn").disabled = true;
+  try {
+    const c = await caches.open(CACHE); let done = 0;
+    for (const t of TRACKS) {
+      if (!(await c.match(url(t)))) { const r = await fetch(url(t)); if (!r.ok) throw new Error(r.status); await c.put(url(t), r); }
+      done++; $("offBtn").textContent = `Saving… ${done}/${TRACKS.length}`;
+    }
+    checkOffline();
+  } catch (e) {
+    $("offBtn").disabled = false; $("offBtn").textContent = "⬇ Try again";
+    $("offTxt").innerHTML = "<b>Saving stopped.</b> The connection dropped. Tap Try again; tracks already saved are kept.";
+  }
+};
+checkOffline();
+render();
+</script>
+</body>
+</html>
