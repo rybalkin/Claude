@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Siena Step by Step</title>
+<meta name="description" content="A GPS audio walk around Siena from San Domenico: 19 short stops with turn-by-turn directions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  /* Layout: map on top, walk controls and stops below, player docked to the bottom.
+     Marble palette shared with Florence on Foot; the rose accent marks the Oltrarno walk, as on the main map. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --rose: #8e3b1f;
+    --me: #1a73e8;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+  .mapwrap { position: relative; }
+  #map { height: 42vh; height: 42svh; min-height: 260px; background: var(--chip); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: 18px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2rem; line-height: 1.1; margin: 2px 0 4px; text-wrap: balance; }
+  .lede { margin: 0; color: var(--muted); }
+  .back { color: var(--rose); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+  button.primary { background: var(--rose); border-color: var(--rose); color: #fff; font-size: 1.05rem; padding: 12px 22px; }
+  .badge { display: inline-block; background: var(--rose); color: #fff; border-radius: 6px; padding: 1px 8px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; vertical-align: 2px; }
+
+  .start { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .start p { margin: 0; font-size: .95rem; }
+  .start .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .92rem; color: var(--muted); }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--rose); }
+  .speed { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .speed button { border: 0; border-radius: 0; padding: 5px 12px; background: transparent; font-variant-numeric: tabular-nums; }
+  .speed button[aria-pressed="true"] { background: var(--chip); }
+
+  .next { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 12px; align-items: center; background: var(--chip); border-radius: 14px; padding: 14px; }
+  .next .arrow { width: 44px; height: 44px; border-radius: 50%; background: var(--me); color: #fff; display: grid; place-items: center; font-size: 20px; }
+  .next b { display: block; font-size: 1.05rem; }
+  .next span { color: var(--muted); font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .banner { background: #fff4d6; border: 1px solid #e8cf86; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+  ol.stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .stop { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 12px; align-items: start; }
+  .stop.playing { border-color: var(--rose); box-shadow: 0 0 0 2px color-mix(in srgb, var(--rose) 25%, transparent); }
+  .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--rose); color: #fff; font-weight: 700; font-size: .85rem; }
+  .stop.heard .num { background: var(--muted); }
+  .stop h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .meta .d { color: var(--me); font-weight: 600; }
+  .stop p.look { margin: 6px 0 0; font-size: .93rem; }
+  .vocab:empty { display: none; }
+  .howto { margin: 10px 0 0; padding: 10px 12px; background: var(--chip); border-radius: 10px; font-size: .9rem; }
+  .howto b { display: block; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--rose); margin-bottom: 2px; }
+  .howto a { color: var(--me); font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .next p { margin: 6px 0 0; font-size: .92rem; }
+  .next a { color: var(--me); font-weight: 600; text-decoration: none; }
+  .vocab { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .vocab li { background: var(--chip); border-radius: 8px; padding: 3px 9px; font-size: .85rem; }
+  .vocab li i { color: var(--muted); font-style: normal; }
+  .stop details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .stop summary { cursor: pointer; font-weight: 600; color: var(--rose); }
+  .stop details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: 52px minmax(0,1fr); gap: 12px; align-items: center; }
+  .player .pp { width: 52px; height: 52px; padding: 0; display: grid; place-items: center; background: var(--rose); border-color: var(--rose); color: #fff; }
+  .player .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; margin-top: 6px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--rose); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
+
+  .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 700 13px/1 var(--body); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: var(--rose); }
+  .pin.heard { background: var(--muted); }
+  .pin.now { background: var(--ink); transform: scale(1.2); }
+  .locate { position: absolute; z-index: 500; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 16px; width: 48px; height: 48px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.25); color: var(--muted); }
+  .locate svg { width: 22px; height: 22px; }
+  .locate.on { color: var(--me); }
+  .locate.follow { background: var(--me); color: #fff; border-color: var(--me); }
+  .gpschip { position: absolute; z-index: 500; left: max(12px, env(safe-area-inset-left, 0px)); top: 12px; background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: .85rem; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.2); font-variant-numeric: tabular-nums; }
+  .me-wrap { position: relative; width: 18px; height: 18px; }
+  .me-cone { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin-left: -9px; margin-top: -30px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid color-mix(in srgb, var(--me) 55%, transparent); transform-origin: 50% 30px; }
+  .me-dot { position: absolute; inset: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 30%, transparent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .me-dot { animation: pulse 2s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--me) 45%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+  }
+</style>
+</head>
+<body>
+<div class="mapwrap">
+  <div id="map" role="region" aria-label="Map of the walk"></div>
+  <div class="gpschip" id="gpsChip" hidden>📍 <span id="gpsChipTxt"></span></div>
+  <button class="locate" id="locateBtn" type="button" aria-label="Show my location">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+  </button>
+</div>
+
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <div class="eyebrow" style="margin-top:10px">San Domenico → Campo → San Domenico · audio walk</div>
+    <h1>Siena Step by Step</h1>
+    <p class="lede">A loop of about 3.5 km with 19 stops, never more than a few minutes apart: St Catherine, the water tunnels, a battle shouted from a tower, a cathedral that was never finished, the Campo and the Palio, panforte, and the she-wolf. Each stop tells you exactly how to reach the next. Giulia and James start talking as you arrive.</p>
+  </header>
+
+  <div class="start">
+    <p><b>Before you start:</b> turn the volume up, or share earbuds. Keep this page open with the screen on. Phones pause GPS when the browser is in the background.</p>
+    <div class="row">
+      <button class="primary" id="startBtn" type="button">▶ Start the walk</button>
+      <label class="toggle"><input type="checkbox" id="auto" checked> Play automatically on arrival</label>
+    </div>
+    <div class="row">
+      <span class="toggle">Speed</span>
+      <div class="speed" role="group" aria-label="Speaking speed">
+        <button type="button" data-r="0.8">0.8×</button><button type="button" data-r="0.9">0.9×</button><button type="button" data-r="1">1×</button>
+      </div>
+    </div>
+    <p class="fine" id="gpsMsg">Starting asks for your location.</p>
+  </div>
+
+  <div class="banner" id="banner" hidden><span id="bannerTxt"></span><button type="button" id="bannerBtn">▶ Play</button></div>
+  <div class="next" id="next" hidden><div class="arrow" aria-hidden="true">➜</div><div style="min-width:0"><b id="nextName"></b><span id="nextDist"></span><p id="nextDir"></p></div></div>
+
+  <ol class="stops" id="stops"></ol>
+
+  <p class="fine">Voices and sounds: ElevenLabs. The line on the map shows the order of the stops, not every street. Check church opening times on the day. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <button class="pp" id="ppBtn" type="button" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+    <div style="min-width:0">
+      <div class="t" id="pTitle">Tap Start, then walk to stop 1</div>
+      <div class="bar" id="pBar"><i id="pFill"></i></div>
+      <div class="time"><span id="pCur">0:00</span><span id="pDur"></span></div>
+    </div>
+  </div>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const STOPS = [{"slug": "01-san-domenico", "name": "Basilica of San Domenico", "sub": "", "lat": 43.3198, "lng": 11.32692, "r": 30, "look": "The big plain brick church. Inside, on the right: the Chapel of St Catherine.", "dir": "Start here, at the main door of San Domenico.", "vocab": [], "dur": 71, "text": "Giulia: Benvenuti a Siena! Welcome, you two. I'm Giulia...\nJames: ...and I'm James. Today we'll walk with you through Siena, one short step at a time. No stop is more than a few minutes from the next.\nGiulia: We start in this huge, plain brick church: San Domenico, built by Dominican friars from the twelve-twenties.\nJames: Inside, on the right, find the Chapel of Saint Catherine. Catherine of Siena is the patron saint of Italy, and in the chapel you'll see a reliquary with... her head.\nGiulia: Her body is in Rome. The legend says the Sienese smuggled the head home in a bag. When guards stopped them and opened it, they found only rose petals.\nJames: Look also for a fresco of Catherine by Andrea Vanni. He knew her personally, so it's thought to be the only portrait made in her lifetime.\nGiulia: When you come out, turn left, and then right along Via del Camporegio. Enjoy the view of the cathedral across the valley. We'll meet you at Catherine's house, just down the hill."}, {"slug": "02-casa-caterina", "name": "St Catherine's House", "sub": "", "lat": 43.31993, "lng": 11.32863, "r": 20, "look": "Catherine's family home, now a sanctuary. Entrance on Costa di Sant'Antonio.", "dir": "About 260 m, 4 min. Leave the church, go left a few steps, then right along Via del Camporegio (the street with the view). After about 130 m bear right into the small Vicolo del Campaccio, then turn right down the steps of Costa di Sant'Antonio. The sanctuary entrance is just ahead.", "vocab": [], "dur": 67, "text": "James: This is where Catherine was born, in 1347. Her father was a wool dyer, and she was one of about twenty-five children.\nGiulia: Twenty-five! Imagine the noise in this house.\nJames: As a teenager she refused to marry, cut off her hair, and joined a Dominican lay order. She lived in a tiny room here, praying and fasting.\nGiulia: But she wasn't a quiet saint. She wrote hundreds of letters, to popes, kings and city leaders, telling them exactly what to do.\nJames: In those years the popes lived in Avignon, in France. Catherine travelled there and urged Pope Gregory the Eleventh to return to Rome. In 1377, he did.\nGiulia: A dyer's daughter from this street, changing the history of the Church. Today she's patron of Italy, and co-patron of Europe.\nJames: Now continue down to the end of the lane, turn right, and follow the little street downhill. At the bottom is a great medieval fountain."}, {"slug": "03-fontebranda", "name": "Fontebranda", "sub": "", "lat": 43.31936, "lng": 11.32768, "r": 20, "look": "The big Gothic fountain with three arches, down a few steps.", "dir": "About 240 m, 4 min downhill. Continue down Costa Sant'Antonio to the end, turn right into Vicolo del Tiratoio and follow it downhill for about 160 m. At the bottom, a few steps lead down to the fountain.", "vocab": [], "dur": 73, "text": "Giulia: This is Fontebranda, the oldest and biggest fountain in Siena. It looks like a little Gothic fortress built around the water, and its present form dates from 1246.\nJames: Here's the thing about Siena: it sits on dry hills, with no river. So the Sienese dug tunnels, the bottini, many kilometres of them, to collect water under the hills and bring it to fountains like this one.\nGiulia: They were so desperate for water that they even searched for a legendary underground river, called the Diana. They never found it.\nJames: And Dante, a Florentine of course, made fun of them for it in his Divine Comedy.\nGiulia: The water flowed from basin to basin: first for drinking, then for animals, then for the dyers and tanners who worked down here. Catherine's family among them.\nJames: This is the territory of the Contrada dell'Oca, the Goose. Catherine is their patron saint. Look for the goose on flags and plaques.\nGiulia: Now climb back up the steps, turn right uphill along Via Santa Caterina, and then right into Via della Galluzza, the narrow street with the arches."}, {"slug": "04-galluzza", "name": "Via della Galluzza", "sub": "", "lat": 43.31933, "lng": 11.32949, "r": 20, "look": "A steep, narrow medieval lane crossed by brick arches.", "dir": "About 230 m, 4 min uphill. Go back up the steps, turn right up Via Santa Caterina for about 140 m, then turn right into Via della Galluzza.", "vocab": [], "dur": 58, "text": "James: Welcome to Via della Galluzza, one of the best-preserved medieval streets in Siena. Steep, narrow, and crossed by brick arches.\nGiulia: Look up at the arches. They're not decoration. They brace the houses on either side, holding them apart and together at the same time.\nJames: Medieval Siena was crowded inside its walls, so houses grew up, not out. Wealthy families even built tall tower houses, to show off and to defend themselves.\nGiulia: Walk slowly here. With a little imagination, you're in the thirteen hundreds: the smell of bread, a donkey with water jars, children running down the steps.\nJames: Follow the lane uphill. It continues straight on as Via di Beccheria and comes out on Via di Città. Turn right there, and look for a long curved palace with a tower."}, {"slug": "05-chigi", "name": "Palazzo Chigi-Saracini", "sub": "", "lat": 43.31712, "lng": 11.33096, "r": 20, "look": "The long palace that curves with Via di Città. Peek into the courtyard with its well.", "dir": "About 290 m, 5 min. Follow Via della Galluzza uphill under the arches; it continues straight as Via di Beccheria and comes out on Via di Città. Turn right and walk about 160 m: the long curved palace with a tower is Palazzo Chigi-Saracini.", "vocab": [], "dur": 65, "text": "Giulia: This is Palazzo Chigi-Saracini. See how the whole building follows the curve of the street?\nJames: Today it's home to the Accademia Chigiana, a famous music academy. In summer, young musicians from all over the world come here for masterclasses. If the door is open, peek into the courtyard.\nGiulia: And there's a legend about that tower. On the fourth of September, 1260, Siena fought Florence at Montaperti, a few kilometres east of the city.\nJames: The story says a man climbed this tower, watched the battle in the distance, and shouted every moment of it to the crowd below, beating a drum.\nGiulia: And Siena won! A huge victory. Dante wrote that the river Arbia ran red with Florentine blood.\nJames: Sienese still mention Montaperti when Florentines get too proud. Now walk on along Via di Città for about forty metres, and turn right up Via del Castoro. Look for an enormous wall with nothing behind it."}, {"slug": "06-facciatone", "name": "The unfinished New Cathedral", "sub": "", "lat": 43.31732, "lng": 11.32981, "r": 22, "look": "The huge, empty wall with big windows: the facade of a cathedral that was never finished.", "dir": "About 120 m, 2 min. Continue along Via di Città about 40 m, then turn right up Via del Castoro. After about 75 m the giant wall rises ahead of you.", "vocab": [], "dur": 67, "text": "James: Look up. This giant wall with empty windows is called the Facciatone, the big facade.\nGiulia: In 1339, Siena was rich and confident, and it decided to build the biggest cathedral in Christendom. The cathedral you're about to see would become just the side arm of a new, enormous church.\nJames: The columns and arches around you are the start of the new nave. This open square would have been inside the church.\nGiulia: Then, in 1348, the Black Death arrived. In a few months, Siena lost perhaps half its people. Workers, money, everything vanished.\nJames: The project was finally abandoned a few years later. And Siena never again was quite as powerful.\nGiulia: Today you can climb to the top of the Facciatone through the cathedral museum. It's one of the best views in the city.\nJames: Now keep going along Via del Castoro, then turn right into Piazza del Duomo, and walk round to the front of the cathedral."}, {"slug": "07-duomo", "name": "The Cathedral facade", "sub": "", "lat": 43.31758, "lng": 11.32838, "r": 22, "look": "The black-and-white striped cathedral front. Your ticket covers the inside.", "dir": "About 210 m, 3 min. Continue along Via del Castoro beside the unfinished nave. At the end, turn right into Piazza del Duomo and walk round to the front of the cathedral.", "vocab": [], "dur": 56, "text": "Giulia: And here it is. The Duomo of Siena.\nJames: Look at those stripes: black and white marble. Black and white are the colours of Siena itself. You'll see them on the city's shield, the balzana.\nGiulia: The lower part of the facade was designed by the sculptor Giovanni Pisano at the end of the twelve hundreds, full of prophets and philosophers. The originals are now inside the museum.\nJames: The upper part, with its pointed gables, came later. The bright golden mosaics are from the eighteen hundreds.\nGiulia: You have tickets with an audio guide for the inside, so we'll leave the interior to them. Just don't miss the marble floor, and the Piccolomini Library, with colours so fresh they look painted yesterday.\nJames: Now turn around. The long building right opposite the cathedral front is our next stop."}, {"slug": "08-scala", "name": "Santa Maria della Scala", "sub": "", "lat": 43.31722, "lng": 11.328, "r": 18, "look": "The long building directly opposite the cathedral front.", "dir": "35 m. Turn around: Santa Maria della Scala is the long building directly opposite the cathedral front.", "vocab": [], "dur": 60, "text": "James: This long building is Santa Maria della Scala, one of the oldest hospitals in Europe. It began around a thousand years ago, caring for pilgrims walking to Rome on the Via Francigena.\nGiulia: And it stayed a hospital until the end of the twentieth century. Almost a thousand years of caring for people.\nJames: The name means Saint Mary of the Ladder. Legend says the mother of its founder dreamed of children climbing a ladder up to heaven.\nGiulia: Inside, there's a great hall, the Pellegrinaio, covered in fifteenth-century frescoes of daily hospital life: doctors, nurses, abandoned babies being taken in and fed.\nJames: The original statues from the Fonte Gaia fountain, which we'll see in the Campo, are also kept inside.\nGiulia: Now walk along the left side of the cathedral, on Via dei Fusari. It goes downhill, around the back, to a square below the church."}, {"slug": "09-battistero", "name": "The Baptistery", "sub": "", "lat": 43.31808, "lng": 11.32927, "r": 20, "look": "The Baptistery, tucked underneath the back of the cathedral.", "dir": "About 140 m, 2 min. Walk along the left (north) side of the cathedral on Via dei Fusari; it winds downhill around the back to Piazza San Giovanni. The Baptistery is under the cathedral's apse.", "vocab": [], "dur": 60, "text": "Giulia: Now look at this: the Baptistery is underneath the cathedral. When Siena extended the cathedral in the thirteen hundreds, they built the new part out over the slope, and put the Baptistery below.\nJames: Inside is a wonderful baptismal font with bronze panels by the best sculptors of the time. Two of them you already know from Florence: Ghiberti, and Donatello.\nGiulia: Donatello's panel shows the Feast of Herod, with Saint John's head on a plate. It's one of the earliest works to use real perspective.\nJames: Florentines in Siena. Some rivalries take a break for good art.\nGiulia: Check whether your ticket includes the Baptistery. If not, you can see it with a combined ticket.\nJames: Now go right, then right again into Via dei Pellegrini. Walk uphill to Via di Città, turn left, and you'll reach a busy three-way junction with an elegant loggia."}, {"slug": "10-croce", "name": "Croce del Travaglio", "sub": "", "lat": 43.31905, "lng": 11.331, "r": 18, "look": "The three-way junction with the elegant Loggia della Mercanzia.", "dir": "About 210 m, 3 min. From the Baptistery go right, then right again into Via dei Pellegrini. Walk uphill about 115 m to Via di Città, turn left, and walk about 80 m to the junction with the loggia.", "vocab": [], "dur": 52, "text": "James: You're at the Croce del Travaglio, the crossroads of Siena. Three main streets meet here.\nGiulia: And they lead to Siena's three parts. Florence has quarters, but Siena is divided into thirds, the terzi: Città, San Martino and Camollia.\nJames: The elegant loggia with statues is the Loggia della Mercanzia, built in the early fourteen hundreds. Here, the merchants' court settled business disputes.\nGiulia: Siena was a city of merchants and bankers, just like Florence. The two cities were rivals in money, as well as in war.\nJames: Now, the best moment of the day. Beside the loggia, take the narrow passage Vicolo di San Paolo downhill. After thirty metres... well, you'll see."}, {"slug": "11-campo", "name": "Piazza del Campo & Fonte Gaia", "sub": "", "lat": 43.31873, "lng": 11.33139, "r": 20, "look": "The top edge of the Campo, by the Fonte Gaia fountain.", "dir": "About 55 m, 1 min. Beside the loggia, take the narrow passage Vicolo di San Paolo downhill. After 30 m it opens onto the Campo. Fonte Gaia is the long fountain at the top edge.", "vocab": [], "dur": 59, "text": "Giulia: Ecco. Piazza del Campo.\nJames: One of the most beautiful squares in the world. It's shaped like a shell, or a fan, and it slopes down towards the town hall.\nGiulia: Count the white lines in the red brick: they divide the square into nine sections, in honour of the Nine, the merchants who governed Siena in its golden age, around 1300.\nJames: The fountain here at the top is the Fonte Gaia, the joyful fountain. When water first arrived here through the tunnels, in 1343, the city celebrated so much that the name stuck.\nGiulia: The sculptures are by Jacopo della Quercia. These are copies; the originals are in Santa Maria della Scala.\nJames: Do what the Sienese do: sit down on the bricks, or even lie back, and look at the sky and the tower.\nGiulia: When you're ready, walk down into the middle of the shell."}, {"slug": "12-palio", "name": "The Palio", "sub": "", "lat": 43.3184, "lng": 11.33165, "r": 18, "look": "The middle of the Campo. Twice a year, horses race around its edge.", "dir": "Walk straight down into the middle of the square, towards the town hall.", "vocab": [], "dur": 60, "text": "James: Now imagine this square packed with fifty thousand people, all standing, all shouting.\nGiulia: This is the Palio, the most famous horse race in Italy. It's held twice a year, on the second of July and the sixteenth of August.\nJames: Earth is spread over the edge of the square to make a track. Ten horses, ridden bareback, race three laps. It lasts about ninety seconds.\nGiulia: Each horse represents a contrada, one of the seventeen neighbourhoods of Siena. And a horse can win even if its jockey has fallen off.\nJames: The horses are taken into the contrada's church to be blessed before the race. And the worst result isn't last place. It's coming second.\nGiulia: The prize is a painted silk banner, the palio. And the winning contrada celebrates for weeks.\nJames: Now walk on to the bottom of the square: the town hall and its tall tower."}, {"slug": "13-palazzo", "name": "Palazzo Pubblico & Torre del Mangia", "sub": "", "lat": 43.31812, "lng": 11.33215, "r": 20, "look": "The town hall at the foot of the square, the tall tower, and the little open chapel at its base.", "dir": "Walk on to the bottom of the square, to the town hall and its tower.", "vocab": [], "dur": 78, "text": "Giulia: This is the Palazzo Pubblico, the town hall, begun in 1297. And next to it, the Torre del Mangia, almost ninety metres tall.\nJames: It's named after one of its first bell-ringers, nicknamed Mangiaguadagni, eat-the-earnings, because he spent all his pay.\nGiulia: We all know someone like that. You can climb around four hundred steps to the top. Places are limited, so book early.\nJames: The little open chapel at the base, the Cappella di Piazza, was built after the Black Death, as a thank-you from the survivors.\nGiulia: And inside the palace, in the Museo Civico, is one of the most important paintings of the Middle Ages: Lorenzetti's Allegory of Good and Bad Government, from 1338.\nJames: On one wall, a well-governed city: people dancing, shops open, farmers in the fields. On the other, a badly governed one: ruins, soldiers, fear. The Nine wanted to see it every day while they worked.\nGiulia: Now walk back up to the top of the Campo, and leave by the narrow passage Vicolo di San Pietro. At the top, bear left into Banchi di Sopra."}, {"slug": "14-nannini", "name": "Nannini & Banchi di Sopra", "sub": "", "lat": 43.31956, "lng": 11.33141, "r": 18, "look": "Banchi di Sopra, the street of the bankers. Nannini is the classic pastry shop.", "dir": "About 240 m, 4 min. Walk back up to the top edge of the Campo and leave by the narrow passage Vicolo di San Pietro. At the top you're at the crossroads again: bear left into Banchi di Sopra. Nannini is about 50 m along.", "vocab": [], "dur": 62, "text": "James: This is Banchi di Sopra. Banchi means benches: the tables where medieval money-changers did business. The word bank comes from banco.\nGiulia: And this is Nannini, Siena's most famous pastry shop. The family also gave Italy a rock star, Gianna Nannini, and a Formula One driver, Alessandro Nannini.\nJames: Time for a sugar break. Try panforte: a dense medieval cake of honey, nuts, spices and candied fruit. Monks and merchants were making something like it eight hundred years ago.\nGiulia: Or ricciarelli: soft almond biscuits covered in sugar. Or cavallucci, little spiced cookies.\nJames: Buy some to take home. Panforte keeps for weeks.\nGiulia: Now continue up Banchi di Sopra for about fifty metres. On your right, a small square opens up with a column and a wolf on top."}, {"slug": "15-tolomei", "name": "Piazza Tolomei & the She-wolf", "sub": "", "lat": 43.32005, "lng": 11.33136, "r": 20, "look": "The small square with the she-wolf column and the stern Palazzo Tolomei.", "dir": "About 60 m, 1 min. Continue up Banchi di Sopra about 50 m; the small square on your right is Piazza Tolomei.", "vocab": [], "dur": 63, "text": "Giulia: Look up at the column: a she-wolf feeding two babies. It's the symbol of Siena.\nJames: Legend says Siena was founded by Senius and Aschius, the sons of Remus. After Romulus killed their father, they fled Rome, carrying a statue of the she-wolf.\nGiulia: They rode one white horse and one black horse. And that's why the city's shield is black and white, like the stripes of the cathedral.\nJames: The stern stone palace is Palazzo Tolomei, from the early twelve hundreds, one of the oldest private palaces in Siena. The Tolomei were bankers, too.\nGiulia: And Dante remembered a woman of this family, Pia de' Tolomei. In Purgatory her ghost says: Siena made me, the Maremma unmade me. The legend says her husband killed her in his castle.\nJames: Now back on Banchi di Sopra, turn right and walk about a hundred and twenty metres. A square with three palaces opens on the right."}, {"slug": "16-salimbeni", "name": "Piazza Salimbeni", "sub": "", "lat": 43.32116, "lng": 11.3307, "r": 22, "look": "The square with three palaces and a statue in the middle: home of the Monte dei Paschi bank.", "dir": "About 150 m, 2 min. Back on Banchi di Sopra, turn right and continue about 120 m. Piazza Salimbeni opens on your right.", "vocab": [], "dur": 57, "text": "James: This is Piazza Salimbeni, and the palaces around you belong to the Monte dei Paschi di Siena.\nGiulia: It was founded in 1472, as a public bank to lend money to the poor and save them from loan sharks. It's often called the oldest bank in the world still in operation.\nJames: Remember our Medici podcast? The Medici bank collapsed after about a century. This one is still open more than five hundred years later.\nGiulia: Although, to be honest, in recent years it needed a big rescue from the Italian state.\nJames: The statue in the middle is Sallustio Bandini, a Sienese economist of the seventeen hundreds.\nGiulia: Now go back to Banchi di Sopra, turn right for a few steps, then left down Costa dell'Incrociata. It becomes Via della Sapienza."}, {"slug": "17-sapienza", "name": "Via della Sapienza & the contrade", "sub": "", "lat": 43.3204, "lng": 11.32846, "r": 22, "look": "Via della Sapienza: the old university street, in the Dragon contrada.", "dir": "About 220 m, 3 min. Go back to Banchi di Sopra, turn right for 20 m, then left down Costa dell'Incrociata, which becomes Via della Sapienza. Walk about 100 m.", "vocab": [], "dur": 73, "text": "Giulia: Via della Sapienza, the street of wisdom. The city's old university stood here, and today it's home to one of Italy's oldest public libraries, the Biblioteca degli Intronati.\nJames: And we're in the territory of the Drago, the Dragon. Remember the seventeen contrade from the Palio? Let's talk about them.\nGiulia: Each contrada has its own animal or symbol, its colours, its church, its museum, and its fountain. Children are even baptised a second time, in the contrada fountain.\nJames: You're a member for life. And rivalries are real. The Goose, by Fontebranda, and the Tower, behind the town hall, are famous enemies.\nGiulia: So, a game for you two. Today you've already walked through the Goose, the Eagle, the Forest, the Owl, the Tower, the Caterpillar and now the Dragon. Look for little plaques on the walls marking the borders.\nJames: Now continue along Via della Sapienza, turn right down Costa di Sant'Antonio, right into Vicolo del Campaccio, and left onto Via del Camporegio. Stop at the railing."}, {"slug": "18-tramonto", "name": "Back at San Domenico: the view", "sub": "", "lat": 43.3196, "lng": 11.3274, "r": 30, "look": "The railing on Via del Camporegio: the cathedral and the Torre del Mangia across the valley.", "dir": "About 200 m, 3 min. Continue along Via della Sapienza, turn right down Costa di Sant'Antonio for 35 m, right into Vicolo del Campaccio, then left onto Via del Camporegio. Stop at the railing.", "vocab": [], "dur": 52, "text": "James: And here we are, back near where we started. Look across the valley.\nGiulia: The striped cathedral, the giant wall of the cathedral that was never finished, and the Torre del Mangia rising over the Campo. You've walked all of it today.\nJames: In the late afternoon the bricks turn gold and pink. This is the colour artists named after the city: burnt sienna.\nGiulia: Thank you for walking with us. Siena is smaller than Florence, but somehow it always feels more intimate. A good city for two.\nJames: If you'd like one more view at sunset, the Medici fortress is about ten minutes from here. Use the Walk here button for directions.\nGiulia: Grazie, and buona serata. Ciao!"}, {"slug": "19-fortezza", "name": "Fortezza Medicea", "sub": "", "lat": 43.32227, "lng": 11.32339, "r": 40, "look": "The Medici fortress, now a park on the walls. Optional, best at sunset.", "dir": "Optional, about 10–12 min. Tap ‘Walk here’ for turn-by-turn directions from where you are.", "vocab": [], "dur": 44, "text": "Giulia: Welcome to the Fortezza Medicea, the Medici fortress.\nJames: Remember the last episode of our podcast? In 1555, after a terrible siege, Siena surrendered to Florence and Duke Cosimo de' Medici. The proud republic was over.\nGiulia: A few years later, Cosimo built this fortress. Its guns pointed at the city as much as at any enemy outside.\nJames: Today it's a park. Sienese families walk their dogs on the walls, and there's a wine bar inside.\nGiulia: Walk along the top of the walls at sunset, and look back at the towers. A beautiful last view of Siena, together."}];
+const ROUTE = [[43.320033, 11.327083], [43.320041, 11.327069], [43.320047, 11.32706], [43.3202, 11.326829], [43.320216, 11.326878], [43.320024, 11.32718], [43.319974, 11.327283], [43.319964, 11.327297], [43.319955, 11.327313], [43.319946, 11.327336], [43.319938, 11.327367], [43.319936, 11.327399], [43.319941, 11.327428], [43.319946, 11.327447], [43.319951, 11.327461], [43.320034, 11.327613], [43.320046, 11.327639], [43.320055, 11.327661], [43.320061, 11.327684], [43.320067, 11.32771], [43.32009, 11.327831], [43.320131, 11.328041], [43.320134, 11.328063], [43.320136, 11.328089], [43.320137, 11.328113], [43.320136, 11.328132], [43.320134, 11.328152], [43.320129, 11.32817], [43.320123, 11.328187], [43.320119, 11.328202], [43.320116, 11.328214], [43.320113, 11.32823], [43.320076, 11.328283], [43.320069, 11.3283], [43.320065, 11.328319], [43.320061, 11.328344], [43.320061, 11.328368], [43.320076, 11.32872], [43.320078, 11.328754], [43.320081, 11.328782], [43.320084, 11.328804], [43.32009, 11.328833], [43.320097, 11.328857], [43.320106, 11.328891], [43.320096, 11.328897], [43.320038, 11.328933], [43.320028, 11.328899], [43.32006, 11.32888], [43.320041, 11.328824], [43.319954, 11.328555], [43.319914, 11.328578], [43.319954, 11.328555], [43.320041, 11.328824], [43.32006, 11.32888], [43.320028, 11.328899], [43.320038, 11.328933], [43.319991, 11.328963], [43.319949, 11.328991], [43.319878, 11.328754], [43.319814, 11.328505], [43.319819, 11.32849], [43.319799, 11.32838], [43.319771, 11.328285], [43.319767, 11.328275], [43.319738, 11.328186], [43.319725, 11.328146], [43.319711, 11.328109], [43.319691, 11.328059], [43.319671, 11.328013], [43.319652, 11.32797], [43.319636, 11.327941], [43.319621, 11.327917], [43.319607, 11.327896], [43.319576, 11.32785], [43.319563, 11.327824], [43.319526, 11.327748], [43.319388, 11.327849], [43.319303, 11.3279], [43.319292, 11.327905], [43.319281, 11.327905], [43.31927, 11.327898], [43.319262, 11.327889], [43.319257, 11.327878], [43.319249, 11.327861], [43.319235, 11.327826], [43.319206, 11.327757], [43.319266, 11.32769], [43.319231, 11.327609], [43.319247, 11.327596], [43.319254, 11.32759], [43.319311, 11.32772], [43.319254, 11.32759], [43.319247, 11.327596], [43.319231, 11.327609], [43.319266, 11.32769], [43.319206, 11.327757], [43.319235, 11.327826], [43.319249, 11.327861], [43.319257, 11.327878], [43.319262, 11.327889], [43.31927, 11.327898], [43.319281, 11.327905], [43.319292, 11.327905], [43.319303, 11.3279], [43.319388, 11.327849], [43.319543, 11.328124], [43.319567, 11.32817], [43.319579, 11.328198], [43.31959, 11.328235], [43.319621, 11.328359], [43.319789, 11.329083], [43.319552, 11.329282], [43.319353, 11.329465], [43.319329, 11.329488], [43.319139, 11.329664], [43.318992, 11.329814], [43.318902, 11.329923], [43.318888, 11.329944], [43.318789, 11.330145], [43.31876, 11.330214], [43.318732, 11.33028], [43.318672, 11.330425], [43.318651, 11.330476], [43.318626, 11.330539], [43.318614, 11.330572], [43.318601, 11.330613], [43.318582, 11.330602], [43.318562, 11.330592], [43.318543, 11.330587], [43.318524, 11.330584], [43.31849, 11.33058], [43.318466, 11.33058], [43.318441, 11.330581], [43.3184, 11.330586], [43.318268, 11.330617], [43.318088, 11.330669], [43.318019, 11.330689], [43.317945, 11.330708], [43.317846, 11.330728], [43.317666, 11.330778], [43.317461, 11.330832], [43.317419, 11.330839], [43.317383, 11.330842], [43.317353, 11.330843], [43.317325, 11.330842], [43.317287, 11.330838], [43.317257, 11.330831], [43.317218, 11.330818], [43.317195, 11.330807], [43.317172, 11.330792], [43.317135, 11.330759], [43.317043, 11.330677], [43.316858, 11.330494], [43.317057, 11.330136], [43.317075, 11.330107], [43.317092, 11.330082], [43.317126, 11.330031], [43.317141, 11.330008], [43.317157, 11.329982], [43.317167, 11.329966], [43.317177, 11.329948], [43.317187, 11.329929], [43.317262, 11.329781], [43.317272, 11.329762], [43.317293, 11.329723], [43.317319, 11.329678], [43.317342, 11.329638], [43.31736, 11.329607], [43.317495, 11.329348], [43.317478, 11.329331], [43.317276, 11.329135], [43.317043, 11.328908], [43.317351, 11.328205], [43.317372, 11.328164], [43.317394, 11.328129], [43.317412, 11.328107], [43.317428, 11.328093], [43.317446, 11.328083], [43.317467, 11.32808], [43.317508, 11.328087], [43.317533, 11.328098], [43.317653, 11.32818], [43.317533, 11.328098], [43.317508, 11.328087], [43.317467, 11.32808], [43.317446, 11.328083], [43.317428, 11.328093], [43.317412, 11.328107], [43.317394, 11.328129], [43.317372, 11.328164], [43.317394, 11.328129], [43.317412, 11.328107], [43.317428, 11.328093], [43.317446, 11.328083], [43.317467, 11.32808], [43.317508, 11.328087], [43.317533, 11.328098], [43.3178, 11.328281], [43.317882, 11.328348], [43.317901, 11.328365], [43.317918, 11.328385], [43.317934, 11.328406], [43.317951, 11.32843], [43.318136, 11.328941], [43.318176, 11.329102], [43.318184, 11.329118], [43.318198, 11.329134], [43.318212, 11.329145], [43.318225, 11.329154], [43.318299, 11.329186], [43.318294, 11.329243], [43.318291, 11.329298], [43.318289, 11.329349], [43.31829, 11.329383], [43.318296, 11.329469], [43.318303, 11.329552], [43.31831, 11.329645], [43.318318, 11.329756], [43.318319, 11.329785], [43.318318, 11.329886], [43.318318, 11.329912], [43.318322, 11.330019], [43.318331, 11.330067], [43.318352, 11.330168], [43.31837, 11.330267], [43.318384, 11.330366], [43.31839, 11.330418], [43.318395, 11.330481], [43.3184, 11.330586], [43.318441, 11.330581], [43.318466, 11.33058], [43.31849, 11.33058], [43.318524, 11.330584], [43.318543, 11.330587], [43.318562, 11.330592], [43.318582, 11.330602], [43.318601, 11.330613], [43.318692, 11.330676], [43.318746, 11.330719], [43.3188, 11.330767], [43.318876, 11.330878], [43.318931, 11.330955], [43.319, 11.331061], [43.318931, 11.330955], [43.318834, 11.331063], [43.318769, 11.331138], [43.318728, 11.331195], [43.318799, 11.331309], [43.3184, 11.33165], [43.31812, 11.33215], [43.318408, 11.332134], [43.318595, 11.332407], [43.318618, 11.332435], [43.31864, 11.332458], [43.318676, 11.332476], [43.318703, 11.332487], [43.31874, 11.332403], [43.31877, 11.332331], [43.318856, 11.332143], [43.318891, 11.332063], [43.318927, 11.331976], [43.318943, 11.331928], [43.318954, 11.331889], [43.318961, 11.331848], [43.318962, 11.331775], [43.318959, 11.331726], [43.318952, 11.331686], [43.318941, 11.331629], [43.318921, 11.331552], [43.318896, 11.331478], [43.31887, 11.331423], [43.318926, 11.331371], [43.31899, 11.33131], [43.319094, 11.331207], [43.319115, 11.331229], [43.319137, 11.331246], [43.319163, 11.331246], [43.31919, 11.331248], [43.31922, 11.331256], [43.319348, 11.331308], [43.319391, 11.331323], [43.319434, 11.331335], [43.319497, 11.331352], [43.319521, 11.331355], [43.319553, 11.331359], [43.319562, 11.33136], [43.319582, 11.331361], [43.319609, 11.331361], [43.319636, 11.331358], [43.319659, 11.331354], [43.319765, 11.33132], [43.319888, 11.331283], [43.31998, 11.331253], [43.32001, 11.331378], [43.31998, 11.331253], [43.320079, 11.331216], [43.320139, 11.331189], [43.320329, 11.331092], [43.320413, 11.33104], [43.320499, 11.330983], [43.320606, 11.330909], [43.320736, 11.330799], [43.32098, 11.330587], [43.320995, 11.330621], [43.321074, 11.330781], [43.320995, 11.330621], [43.32098, 11.330587], [43.321132, 11.330452], [43.321115, 11.33041], [43.320973, 11.330066], [43.32083, 11.329769], [43.320802, 11.329711], [43.32072, 11.329541], [43.32044, 11.328996], [43.320421, 11.328953], [43.320407, 11.328906], [43.3204, 11.328857], [43.320396, 11.328806], [43.320397, 11.328759], [43.320398, 11.328712], [43.320426, 11.328465], [43.320398, 11.328712], [43.320369, 11.32873], [43.320106, 11.328891], [43.320097, 11.328857], [43.32009, 11.328833], [43.320084, 11.328804], [43.320081, 11.328782], [43.320078, 11.328754], [43.320076, 11.32872], [43.320061, 11.328368], [43.320061, 11.328344], [43.320065, 11.328319], [43.320069, 11.3283], [43.320076, 11.328283], [43.320113, 11.32823], [43.320116, 11.328214], [43.320119, 11.328202], [43.320123, 11.328187], [43.320103, 11.328154], [43.320073, 11.328105], [43.32002, 11.328027], [43.319966, 11.327952], [43.319831, 11.327765], [43.319815, 11.327743], [43.3198, 11.327724], [43.319786, 11.327708], [43.319771, 11.327692], [43.319753, 11.327676], [43.319734, 11.32766], [43.319711, 11.327644], [43.319679, 11.327621], [43.319617, 11.32758], [43.319566, 11.327548], [43.319556, 11.327542]];
+STOPS.forEach((s, i) => { s.i = i; s.src = `audio/siena/${s.slug}.mp3`; });
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+const audio = $("audio");
+let heard = new Set(store.get("siena-heard", [])), triggered = new Set(heard), queue = [], current = -1;
+let me = null, watchId = null, started = false, wakeLock = null, centered = false, follow = true;
+let rate = store.get("siena-rate", 1);
+
+const haversine = (a, b) => { const R = 6371000, t = d => d * Math.PI / 180, dLat = t(b.lat - a.lat), dLng = t(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(t(a.lat)) * Math.cos(t(b.lat)) * Math.sin(dLng / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const fmtDist = m => m < 1000 ? `${Math.round(m / 5) * 5} m` : `${(m / 1000).toFixed(1)} km`;
+const mins = m => Math.max(1, Math.round(m * 1.25 / 75));
+const fmtTime = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const walkUrl = s => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=walking`;
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* Karte */
+const map = L.map("map", { zoomControl: false }).fitBounds(ROUTE, { padding: [30, 30] });
+L.control.zoom({ position: "topright" }).addTo(map);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+L.polyline(ROUTE, { color: "#8e3b1f", weight: 5, opacity: .55 }).addTo(map);
+const pins = STOPS.map(s => L.marker([s.lat, s.lng], { title: s.name }).addTo(map).on("click", () => playStop(s.i, true)));
+let meMarker = null, meCircle = null, toNext = null;
+function refreshPins() { STOPS.forEach((s, i) => pins[i].setIcon(L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 14], html: `<div class="pin ${i === current ? "now" : heard.has(i) ? "heard" : ""}">${i + 1}</div>` }))); }
+map.on("dragstart", () => { follow = false; $("locateBtn").classList.remove("follow"); });
+
+/* Liste */
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+function renderList() {
+  $("stops").innerHTML = STOPS.map(s => {
+    const d = me ? `<span class="d">${fmtDist(haversine(me, s))}</span> · ` : "";
+    const now = s.i === current && !audio.paused;
+    return `<li class="stop ${s.i === current ? "playing" : ""} ${heard.has(s.i) ? "heard" : ""}" id="stop-${s.i}">
+      <span class="num">${s.i + 1}</span>
+      <div style="min-width:0">
+        <h3>${esc(s.name)}${s.sub ? ` <span class="meta">· ${esc(s.sub)}</span>` : ""}</h3>
+        <div class="meta">${d}${fmtTime(s.dur)} · ${heard.has(s.i) ? "✓ heard" : "plays on arrival"}</div>
+        <p class="look">${esc(s.look)}</p>
+        <div class="howto"><b>How to get here</b> ${esc(s.dir)} <a href="${walkUrl(s)}" target="_blank" rel="noopener">Walk here ↗</a></div>
+        <ul class="vocab" aria-label="Vocabulary">${s.vocab.map(([de, en]) => `<li><b>${esc(de)}</b> <i>${esc(en)}</i></li>`).join("")}</ul>
+        <details><summary>Read along</summary><p>${esc(s.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${s.i}" aria-label="${now ? "Pause" : "Play"}: ${esc(s.name)}">${now ? pauseSvg : playSvg}</button></li>`;
+  }).join("");
+  $("stops").querySelectorAll(".play").forEach(b => b.onclick = () => { const i = +b.dataset.i; if (i === current && !audio.paused) audio.pause(); else playStop(i, true); });
+}
+function nextStop() { const reached = Math.max(-1, current, ...triggered); return STOPS.find(s => s.i > reached && !triggered.has(s.i)) || null; }
+function renderNext() {
+  const n = nextStop();
+  $("next").hidden = false;
+  $("nextDir").innerHTML = n ? `${esc(n.dir)} <a href="${walkUrl(n)}" target="_blank" rel="noopener">Walk here ↗</a>` : "";
+  if (!n) { $("nextName").textContent = "You've heard every stop"; $("nextDist").textContent = "Enjoy the evening!"; if (toNext) { toNext.remove(); toNext = null; } return; }
+  $("nextName").textContent = `${started ? "Next" : "First stop"}: ${n.i + 1}. ${n.name}`;
+  if (me) {
+    const d = haversine(me, n); $("nextDist").textContent = `${fmtDist(d)} · about ${mins(d)} min walk`;
+    const ll = [[me.lat, me.lng], [n.lat, n.lng]];
+    if (!toNext) toNext = L.polyline(ll, { color: "#1a73e8", weight: 3, dashArray: "4 8", opacity: .8 }).addTo(map); else toNext.setLatLngs(ll);
+  } else $("nextDist").textContent = started ? "Waiting for GPS…" : "Tap Start when you're ready";
+}
+
+/* Audio */
+function setPlayerUi() {
+  const s = STOPS[current];
+  $("pTitle").textContent = s ? `${s.i + 1}. ${s.name}` : (started ? "Walk on to the next stop" : "Tap Start, then walk to stop 1");
+  $("ppIcon").innerHTML = audio.paused || !s ? '<path d="M7 4.5v15l13-7.5z"/>' : '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+  $("ppBtn").setAttribute("aria-label", audio.paused ? "Play" : "Pause");
+}
+function playStop(i, user) {
+  const s = STOPS[i];
+  queue = queue.filter(q => q !== i); triggered.add(i); current = i;
+  audio.src = s.src; audio.playbackRate = rate;
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: "Giulia & James", album: "Siena Step by Step" });
+  audio.play().then(() => { $("banner").hidden = true; }).catch(() => { $("bannerTxt").textContent = `You've reached ${s.name}.`; $("banner").hidden = false; });
+  if (user) map.panTo([s.lat, s.lng]);
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+}
+$("bannerBtn").onclick = () => { audio.play().catch(() => {}); $("banner").hidden = true; };
+$("ppBtn").onclick = () => { if (current < 0) { const n = nextStop() || STOPS[0]; playStop(n.i, true); return; } if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+audio.addEventListener("play", () => { audio.playbackRate = rate; setPlayerUi(); renderList(); });
+audio.addEventListener("pause", () => { setPlayerUi(); renderList(); });
+audio.addEventListener("timeupdate", () => { if (!audio.duration || current < 0) return; $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`; $("pCur").textContent = fmtTime(audio.currentTime); $("pDur").textContent = fmtTime(audio.duration); });
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  if (current >= 0) { heard.add(current); store.set("siena-heard", [...heard]); }
+  current = -1; $("pFill").style.width = "0"; $("pCur").textContent = "0:00"; $("pDur").textContent = "";
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+  if (queue.length) playStop(queue.shift(), false);
+});
+function renderSpeed() { document.querySelectorAll(".speed button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.r === rate)); }
+document.querySelectorAll(".speed button").forEach(b => b.onclick = () => { rate = +b.dataset.r; store.set("siena-rate", rate); audio.playbackRate = rate; renderSpeed(); });
+
+/* GPS */
+function onPos(pos) {
+  me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+  const ll = [me.lat, me.lng], hd = pos.coords.heading, moving = (pos.coords.speed || 0) > 0.4;
+  const cone = typeof hd === "number" && !isNaN(hd) && moving ? `<div class="me-cone" style="transform:rotate(${hd}deg)"></div>` : "";
+  const icon = L.divIcon({ className: "", html: `<div class="me-wrap">${cone}<div class="me-dot"></div></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+  if (!meMarker) {
+    meCircle = L.circle(ll, { radius: me.acc, color: "#1a73e8", weight: 1, fillOpacity: .1, interactive: false }).addTo(map);
+    meMarker = L.marker(ll, { icon, zIndexOffset: 1000, title: "You are here" }).addTo(map);
+  } else { meMarker.setLatLng(ll).setIcon(icon); meCircle.setLatLng(ll).setRadius(me.acc); }
+  if (!centered) { map.setView(ll, 17); centered = true; } else if (follow) map.panTo(ll);
+  $("locateBtn").classList.add("on"); $("locateBtn").classList.toggle("follow", follow);
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = `You · ±${Math.round(me.acc)} m`;
+  $("gpsMsg").textContent = `GPS on · accurate to about ${Math.round(me.acc)} m`;
+  if (started && $("auto").checked) STOPS.forEach(s => {
+    if (triggered.has(s.i)) return;
+    if (haversine(me, s) <= s.r + Math.min(me.acc, 20)) {
+      triggered.add(s.i);
+      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      if (current < 0) playStop(s.i, false); else if (!queue.includes(s.i)) queue.push(s.i);
+    }
+  });
+  renderList(); renderNext();
+}
+function onErr(e) {
+  if (!me) { $("gpsChip").hidden = false; $("gpsChipTxt").textContent = e.code === 1 ? "Location blocked" : "Looking for GPS…"; }
+  $("gpsMsg").textContent = e.code === 1 ? "Location was refused. Allow it for this site in your browser settings, then reload. You can still tap ▶ on any stop." : "Still looking for GPS. Tall walls can get in the way.";
+  if (e.code === 1 && watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+function startGps() {
+  if (watchId !== null) return;
+  if (!("geolocation" in navigator)) { $("gpsMsg").textContent = "This browser can't share location."; return; }
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = "Finding you…";
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+$("locateBtn").onclick = () => { startGps(); follow = true; $("locateBtn").classList.add("follow"); if (me) map.setView([me.lat, me.lng], Math.max(map.getZoom(), 17)); };
+try { navigator.permissions?.query({ name: "geolocation" }).then(st => { if (st.state === "granted") startGps(); }).catch(() => {}); } catch (e) {}
+async function keepAwake() { try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (started && document.visibilityState === "visible") keepAwake(); });
+
+$("startBtn").onclick = () => {
+  started = true;
+  audio.src = "audio/silence.mp3";   // Kurzer stummer Ton im Tipp, damit das Handy später automatisch abspielen darf.
+  audio.play().catch(() => {}).finally(() => { startGps(); if (me) onPos({ coords: { latitude: me.lat, longitude: me.lng, accuracy: me.acc } }); });
+  keepAwake();
+  $("startBtn").textContent = "Walking ✓"; $("startBtn").disabled = true;
+  setPlayerUi(); renderNext();
+};
+$("resetBtn").onclick = () => { heard = new Set(); triggered = new Set(); queue = []; store.set("siena-heard", []); refreshPins(); renderList(); renderNext(); };
+renderSpeed(); refreshPins(); renderList(); setPlayerUi();
+</script>
+</body>
+</html>
