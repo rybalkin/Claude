@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate audio-guide files in the "calm lecturer" voice (see VOICE_GUIDE.md).
+"""Generate audio in the "calm lecturer" voice (see VOICE_STYLE.md).
 
 Usage:
     export ELEVENLABS_API_KEY=...            # never commit the key

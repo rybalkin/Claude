@@ -12,6 +12,8 @@ Times and the map are approximate and for illustration only.
 
 GPS only works when the page is served over https, for example with GitHub Pages turned on for this repo.
 
-# Voice guide
+# Voice and audio-guide docs
 
-`VOICE_GUIDE.md` explains how the Siena audio guide voice was made (ElevenLabs v4, voice "Jessica", calm lecture style, pauses with `[pauses]` / `[long pause]` tags, raw 192 kbps, no post-processing), with examples in English, German and Russian. `tools/tts_lecture.py` generates new files in the same voice from a JSON of scripts.
+- `VOICE_STYLE.md`: how to recreate the calm-lecturer voice for any app (ElevenLabs v4, voice "Jessica", pace, `[pauses]` / `[long pause]` tags, emphasis, tone, background, other languages, code, pitfalls).
+- `AUDIO_GUIDE.md`: how to build a walking audio guide with it (tour structure, stops and directions, "Find it" challenges, indoor tracks, map data, GPS page).
+- `tools/tts_lecture.py`: generates MP3s in this voice from a JSON of scripts.
