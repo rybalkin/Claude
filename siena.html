@@ -28,7 +28,7 @@
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
   .mapwrap { position: relative; }
   #map { height: 42vh; height: 42svh; min-height: 260px; background: var(--chip); }
   .wrap { max-width: 720px; margin: 0 auto; padding-block: 18px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
@@ -83,7 +83,16 @@
 
   .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
     padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-  .player .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: 52px minmax(0,1fr); gap: 12px; align-items: center; }
+  .player .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: auto minmax(0,1fr); gap: 10px; align-items: center; }
+  .player .ctl { display: flex; align-items: center; gap: 4px; }
+  .player .sk { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); color: var(--ink); }
+  .player .sk svg { width: 16px; height: 16px; }
+  .player .nx { display: flex; gap: 6px; align-items: baseline; width: 100%; margin-top: 4px; padding: 0; border: 0; background: none; text-align: left; font-weight: 400; font-size: .82rem; color: var(--me); }
+  .player .nx span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .player .nx b { white-space: nowrap; }
+  .player .way { max-width: 720px; margin: 0 auto 8px; background: var(--chip); border-radius: 12px; padding: 10px 12px; font-size: .9rem; max-height: 40vh; overflow: auto; }
+  .player .way p { margin: 4px 0 6px; }
+  .player .way a { color: var(--me); font-weight: 600; text-decoration: none; }
   .player .pp { width: 52px; height: 52px; padding: 0; display: grid; place-items: center; background: var(--rose); border-color: var(--rose); color: #fff; }
   .player .pp svg { width: 22px; height: 22px; }
   .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -149,12 +158,18 @@
 </div>
 
 <div class="player">
+  <div class="way" id="pWay" hidden><div class="in2"><b id="pWayTitle"></b><p id="pWayText"></p><a id="pWayLink" target="_blank" rel="noopener">Walk here in Maps ↗</a></div></div>
   <div class="in">
-    <button class="pp" id="ppBtn" type="button" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+    <div class="ctl">
+      <button class="sk" id="prevBtn" type="button" aria-label="Previous stop"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="pp" id="ppBtn" type="button" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+      <button class="sk" id="nextBtn" type="button" aria-label="Next stop"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    </div>
     <div style="min-width:0">
       <div class="t" id="pTitle">Tap Start, then walk to stop 1</div>
       <div class="bar" id="pBar"><i id="pFill"></i></div>
       <div class="time"><span id="pCur">0:00</span><span id="pDur"></span></div>
+      <button class="nx" id="pNext" type="button" aria-expanded="false"><span id="pNextTxt">Next stop</span> <b id="pWayBtn">Way ▸</b></button>
     </div>
   </div>
 </div>
@@ -186,9 +201,13 @@ const map = L.map("map", { zoomControl: false }).fitBounds(ROUTE, { padding: [30
 L.control.zoom({ position: "topright" }).addTo(map);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
 L.polyline(ROUTE, { color: "#8e3b1f", weight: 5, opacity: .55 }).addTo(map);
-const pins = STOPS.map(s => L.marker([s.lat, s.lng], { title: s.name }).addTo(map).on("click", () => playStop(s.i, true)));
+const pinGroups = Object.values(STOPS.reduce((g, s) => { const k = s.lat.toFixed(5) + "," + s.lng.toFixed(5); (g[k] = g[k] || []).push(s.i); return g; }, {}));
+const pins = pinGroups.map(g => L.marker([STOPS[g[0]].lat, STOPS[g[0]].lng], { title: g.map(i => STOPS[i].name).join(" + ") }).addTo(map)
+  .on("click", () => { const u = g.find(i => !heard.has(i)); playStop(u === undefined ? g[0] : u, true); }));
 let meMarker = null, meCircle = null, toNext = null;
-function refreshPins() { STOPS.forEach((s, i) => pins[i].setIcon(L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 14], html: `<div class="pin ${i === current ? "now" : heard.has(i) ? "heard" : ""}">${i + 1}</div>` }))); }
+function refreshPins() { pinGroups.forEach((g, k) => { const label = g.map(i => i + 1).join("·"), w = Math.max(28, 12 + label.length * 8);
+  const cls = g.includes(current) ? "now" : g.every(i => heard.has(i)) ? "heard" : "";
+  pins[k].setIcon(L.divIcon({ className: "", iconSize: [w, 28], iconAnchor: [w / 2, 14], html: `<div class="pin ${cls}" style="width:${w}px;border-radius:14px">${label}</div>` })); }); }
 map.on("dragstart", () => { follow = false; $("locateBtn").classList.remove("follow"); });
 
 /* Liste */
@@ -214,6 +233,7 @@ function renderList() {
 }
 function nextStop() { const reached = Math.max(-1, current, ...triggered); return STOPS.find(s => s.i > reached && !triggered.has(s.i)) || null; }
 function renderNext() {
+  renderPlayerNext();
   const n = nextStop();
   $("next").hidden = false;
   $("nextDir").innerHTML = n ? `${esc(n.dir)} <a href="${walkUrl(n)}" target="_blank" rel="noopener">Walk here ↗</a>` : "";
@@ -235,9 +255,9 @@ function setPlayerUi() {
 }
 function playStop(i, user) {
   const s = STOPS[i];
-  queue = queue.filter(q => q !== i); triggered.add(i); current = i;
+  queue = queue.filter(q => q !== i); triggered.add(i); current = i; lastIdx = i;
   audio.src = s.src; audio.playbackRate = rate;
-  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: "Giulia & James", album: "Siena Step by Step" });
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: "Siena Step by Step", album: "Siena Step by Step" });
   audio.play().then(() => { $("banner").hidden = true; }).catch(() => { $("bannerTxt").textContent = `You've reached ${s.name}.`; $("banner").hidden = false; });
   if (user) map.panTo([s.lat, s.lng]);
   refreshPins(); renderList(); setPlayerUi(); renderNext();
@@ -306,7 +326,28 @@ $("startBtn").onclick = () => {
   setPlayerUi(); renderNext();
 };
 $("resetBtn").onclick = () => { heard = new Set(); triggered = new Set(); queue = []; store.set("siena2-heard", []); refreshPins(); renderList(); renderNext(); };
-renderSpeed(); refreshPins(); renderList(); setPlayerUi();
+
+/* Player: previous / next stop, and the way to the next stop without scrolling */
+let lastIdx = -1;
+const cursor = () => current >= 0 ? current : (lastIdx >= 0 ? lastIdx : (nextStop() ? nextStop().i - 1 : -1));
+function upcoming() { const c = cursor(); return STOPS[Math.min(STOPS.length - 1, c + 1)] && c + 1 < STOPS.length ? STOPS[c + 1] : null; }
+function renderPlayerNext() {
+  const n = upcoming();
+  if (!n) { $("pNextTxt").textContent = "That was the last stop. Grazie!"; $("pWayBtn").hidden = true; $("pWay").hidden = true; return; }
+  $("pWayBtn").hidden = false;
+  const here = me ? haversine(me, n) : null;
+  const same = current >= 0 && STOPS[current] && STOPS[current].lat === n.lat && STOPS[current].lng === n.lng;
+  $("pNextTxt").textContent = `Next: ${n.i + 1}. ${n.name}` + (same ? " · right here" : here !== null ? ` · ${fmtDist(here)} · ${mins(here)} min` : "");
+  $("pWayTitle").textContent = `${n.i + 1}. ${n.name}`;
+  $("pWayText").textContent = n.dir || "";
+  $("pWayLink").href = walkUrl(n);
+}
+$("pNext").onclick = () => { const open = $("pWay").hidden; $("pWay").hidden = !open; $("pWayBtn").textContent = open ? "Way ▾" : "Way ▸"; $("pNext").setAttribute("aria-expanded", open); };
+$("prevBtn").onclick = () => { const c = cursor(); if (c > 0) playStop(c - 1, true); };
+$("nextBtn").onclick = () => { const c = cursor(); if (c + 1 < STOPS.length) playStop(c + 1, true); };
+if ("mediaSession" in navigator) { try { navigator.mediaSession.setActionHandler("previoustrack", () => $("prevBtn").onclick()); navigator.mediaSession.setActionHandler("nexttrack", () => $("nextBtn").onclick()); } catch (e) {} }
+
+renderSpeed(); refreshPins(); renderList(); setPlayerUi(); renderPlayerNext();
 </script>
 </body>
 </html>
