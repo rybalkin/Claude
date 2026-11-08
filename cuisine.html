@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Butter and Olive Oil</title>
+<meta name="description" content="A podcast about French and Italian cuisine: how they shaped each other, from Rome to today, in sixteen short episodes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a museum audio-guide handset. Number keys on top, tracks grouped by floor, a docked player.
+     Same marble palette as Florence on Foot; the gold accent stands for the gold-ground altarpieces. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --green: #2f6b57;
+    --gold: #9a6d14;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: max(20px, env(safe-area-inset-top, 0px)) 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+  .back { color: var(--green); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1.1; margin: 2px 0 6px; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 400; font-size: 1.35rem; margin: 6px 0 0; }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible, .track:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+  .offline { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--chip); border-radius: 14px; padding: 12px 14px; }
+  .offline p { margin: 0; flex: 1 1 220px; min-width: 0; font-size: .92rem; }
+  .offline.done { background: color-mix(in srgb, var(--green) 12%, var(--panel)); }
+
+  .keys { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .keys button { padding: 0; height: 48px; border-radius: 12px; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .keys button.heard { color: var(--muted); background: var(--chip); }
+  .keys button.now { background: var(--green); border-color: var(--green); color: #fff; }
+
+  ol.tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .track { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: start; scroll-margin-top: 16px; scroll-margin-bottom: 140px; }
+  .track.now { border-color: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 25%, transparent); }
+  .no { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--ink); color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track.heard .no { background: var(--muted); }
+  .track.now .no { background: var(--green); }
+  .track h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track p.look { margin: 6px 0 0; font-size: .93rem; }
+  .track details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .track summary { cursor: pointer; font-weight: 600; color: var(--green); }
+  .track details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .player .row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; align-items: center; }
+  .ctrls { display: flex; gap: 6px; align-items: center; }
+  .ctrls button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); }
+  .ctrls .pp { width: 52px; height: 52px; background: var(--green); color: #fff; }
+  .ctrls svg { width: 18px; height: 18px; } .ctrls .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--green); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .time label { display: inline-flex; gap: 6px; align-items: center; }
+  .time input { width: 16px; height: 16px; accent-color: var(--green); margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <div class="eyebrow" style="margin-top:10px">A podcast · 16 episodes in 10 chapters</div>
+    <h1>Butter and Olive Oil</h1>
+    <p class="lede">France and Italy at the table: two sisters with the same Roman mother. Renaissance foundations, the Catherine de' Medici myth, La Varenne and Versailles, socca and farinata, fondue and fonduta, Escoffier and Artusi, cathedral sauces and three-ingredient pasta, Nouvelle Cuisine and Slow Food, Ducasse and Bottura, and Paris and Milan today. About 31 minutes, one narrator. Press play and listen anywhere.</p>
+  </header>
+
+  <div class="offline" id="offline">
+    <p id="offTxt"><b>Walking somewhere quiet?</b> Save all tracks to this phone now (45 MB) so they play without internet.</p>
+    <button type="button" id="offBtn">⬇ Save for offline</button>
+  </div>
+
+  <section>
+    <div class="eyebrow" style="margin-bottom:8px">Episodes</div>
+    <div class="keys" id="keys" role="group" aria-label="Track numbers"></div>
+  </section>
+
+  <div id="list"></div>
+
+  <p class="fine">Narration made with ElevenLabs. Where a story is a legend or the evidence is thin, the narrator says so. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <div class="row">
+      <div class="ctrls">
+        <button type="button" id="prevBtn" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button type="button" class="pp" id="ppBtn" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+        <button type="button" id="nextBtn" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      </div>
+      <div style="min-width:0">
+        <div class="t" id="pTitle">1 · Two sisters, one Roman mother</div>
+        <div class="meta" id="pFloor">Press play</div>
+      </div>
+    </div>
+    <div class="bar" id="pBar"><i id="pFill"></i></div>
+    <div class="time"><span id="pCur">0:00</span><label><input type="checkbox" id="auto"> Play next episode automatically</label><span id="pDur"></span></div>
+  </div>
+</div>
+<audio id="audio" preload="none"></audio>
+
+<script>
+const TRACKS = [{"slug": "01-rome", "title": "Two sisters, one Roman mother", "floor": "1 · Roman and Renaissance foundations", "look": "Before France and Italy existed: garum, reclining banquets, and the vines that Greeks and Romans planted in Gaul.", "n": 1, "dur": 111, "text": "Welcome to Butter and Olive Oil. A podcast about two cuisines, French and Italian, and the long, complicated relationship between them. They are the two most famous kitchens in the world. They are neighbours. And for five hundred years, each has been quietly convinced that the other one learned everything from it. So let's start before either of them existed. With Rome. Picture a Roman dinner. Guests lie on couches around the table, propped on one elbow. The meal goes, as the Romans said, from the egg to the apples. Eggs and small dishes to begin, then the meats, then fruit and sweets. And on almost everything, garum. A sauce of fermented fish, salty, powerful, used the way we use salt, or soy sauce. We even have a Roman cookbook, under the name of Apicius. It is full of sweet and sour, honey with vinegar, pepper on everything. Rich Romans wanted food that showed how far their money could reach. Meanwhile, in what is now southern France, Greek colonists had founded Marseille, around six hundred before Christ. They brought the vine, and the olive tree. Then came the Romans. They called the region simply the Province. Provincia. Provence. So the first thing to remember is this. Southern France and Italy did not borrow from each other at first. They were the SAME world. Same oil, same wine, same bread, same Latin. The border came much later. And, as we will see, the food never completely accepted it."}, {"slug": "02-renaissance", "title": "When Italy set the table", "floor": "1 · Roman and Renaissance foundations", "look": "The first printed cookbook, Pope's cooks, the fork, and French kings who invaded Italy and came home dazzled.", "n": 2, "dur": 118, "text": "After Rome fell, the rich of Europe ate in much the same way for centuries. Spices, sugar, sweet and sour, huge roasts, and bread thickening every sauce. A medieval feast in Paris and one in Florence were close cousins. But in the fifteenth century, something changed in Italy first. Around fourteen sixty-five, a cook called Maestro Martino wrote down his recipes. Clear, precise, with cooking times, and a new respect for vegetables and fresh herbs. A humanist called Platina took those recipes, added philosophy and advice on health, and published them in Latin. It became the first printed cookbook in history. And here is the detail that matters for us. In fifteen hundred and five, that book was translated into French, in Lyon. Italian cooking, travelling north, on paper. It also travelled with armies. In fourteen ninety-four, the French king Charles the Eighth invaded Italy. Militarily, the Italian wars were a disaster for everyone. Culturally, the French were stunned. Gardens, palaces, manners, food. Charles brought Italian gardeners and craftsmen home with him. Twenty years later, Francis the First brought Leonardo da Vinci. Then, in fifteen seventy, Bartolomeo Scappi, cook to the Pope, published an enormous book, with engravings of the whole kitchen. Pots, knives, pasta cutters, and a small object Italians already used at table, while most of Europe still ate with knives and fingers. The fork. In the sixteenth century, if you wanted to eat elegantly, you looked south, towards Italy."}, {"slug": "03-catherine-myth", "title": "The queen who brought the fork", "floor": "2 · Myth and reality: Catherine de' Medici", "look": "The famous story: a fourteen-year-old Florentine bride, her cooks, sorbet, forks and duck with orange. Why it is too good to be true.", "n": 3, "dur": 115, "text": "And now, the most famous story in the history of French food. Marseille, fifteen thirty-three. A fourteen-year-old girl from Florence marries the second son of the King of France. Her name is Catherine de' Medici. Her uncle is the Pope. And, the story goes, she brings with her an army of Florentine cooks. And these cooks, so the legend says, civilise the French. They teach them to use the fork. They bring sorbet, and ice cream. Macarons. Frangipane. Even duck with orange, which, we are told, was really a Florentine dish of duck with bitter oranges. Before Catherine, French food was medieval and crude. After Catherine, French cuisine was born. From an Italian mother. It is a wonderful story. Italians love it, for obvious reasons. And for a long time, many French writers repeated it too. There is only one problem. There is almost NO evidence for it. Catherine did bring a household from Italy, as every foreign princess did. But no document describes a team of Florentine chefs transforming the French kitchen. French cookbooks of the following decades look very much like the old ones. Spices, sugar, sweet and sour. No revolution. And the dishes? Frangipane is named after an Italian marquis, but the cream appears in French cookbooks only in the following century. And the story itself, the queen with the army of cooks, appears in writing only one or two centuries after she died. So, was Catherine irrelevant? ACTUALLY, no. The truth is less romantic, but more interesting."}, {"slug": "04-catherine-real", "title": "What Italy really gave", "floor": "2 · Myth and reality: Catherine de' Medici", "look": "Artichokes, sugar and sorbet, a book of manners, a mocked fork, a second Medici queen, and a Sicilian café in Paris.", "n": 4, "dur": 120, "text": "What did Italy REALLY give the French table in those years? First, ingredients and fashions. Italian vegetables were the height of chic. Artichokes, above all. Catherine herself adored them. A Paris diarist wrote that at one wedding, she ate so many artichoke hearts that she thought she would burst. Second, sugar work and sweets. Italian confectioners were famous across Europe, for candied fruit, sugar sculptures, and iced drinks. Third, manners. In fifteen fifty-eight, a Florentine bishop, Giovanni della Casa, published a little book on how to behave. Don't scratch at table. Don't sniff the food. Don't lick your fingers. It was translated into French within a few years, and his title, Galateo, became the Italian word for good manners. And the fork? It did arrive at the French court, in those years. And the French were not impressed. A satire from around sixteen hundred mocks courtiers who struggle with these little forked instruments, dropping half their food on the way to their mouths. The fork, in France, took another century to win. In sixteen hundred, another Medici became Queen of France. Marie, wife of Henri the Fourth. And Italian taste kept flowing north. And ice cream? The real hero is not a queen. In sixteen eighty-six, a Sicilian, Francesco Procopio, opened a café in Paris. He sold coffee, and ices. Le Procope. It is still there. So, Italy did shape French dining. Not in one dramatic wedding, but slowly, through books, cooks, fashions, and shopkeepers. Which is how influence usually works."}, {"slug": "05-varenne", "title": "France writes the rules", "floor": "3 · The 17th and 18th-century divergence", "look": "La Varenne, 1651: roux, stocks, bouquet garni, and the taste of the thing itself. Versailles turns cooking into a state art.", "n": 5, "dur": 117, "text": "Sixteen fifty-one. A book appears in Paris, and it changes everything. Le Cuisinier françois. The French Cook. Its author is François Pierre, known as La Varenne, cook to a marquis. Open it, and you can feel the Middle Ages ending. Fewer spices. Less sugar in savoury dishes. Sauces thickened not with bread, but with flour cooked in fat. A roux. Stocks made in advance, to be the base of everything. A little bundle of herbs, the bouquet garni. Mushrooms chopped and cooked down, named after his employer, the Marquis d'Uxelles. Duxelles. And a new idea is in the air. A few years later, another French writer says it plainly. A cabbage soup should taste of cabbage. Remember that sentence. We will meet it again, on the other side of the Alps. Then comes Louis the Fourteenth, and Versailles. Food becomes a state art. Dozens of dishes are laid on the table at once, in perfect symmetry, like the gardens outside. The king eats in public, and courtiers watch. French cooks start to write down not only recipes, but rules. Systems. Basic preparations, and what can be built on top of them. In sixteen ninety-one, one of these books gives us an early crème brûlée. And the books travel. Into English, German, Italian. Across Europe, every court wants a French cook. France has done something no one else did. It has turned a way of cooking into a language, with grammar, that anyone can learn. And a language can be exported."}, {"slug": "06-italy-regional", "title": "Italy stays many", "floor": "3 · The 17th and 18th-century divergence", "look": "No capital, no Versailles: Naples, Turin and the monsù. The first tomato sauce, and a Piedmontese cook perfected in Paris.", "n": 6, "dur": 119, "text": "And Italy? In the same years, there is no Italy. There is the Kingdom of Naples, under Spain. Milan, also Spanish. Venice, a republic. The Pope in Rome. The Medici in Florence. The Dukes of Savoy in Turin. No single capital. No Versailles. No one court to set the rules for everyone. So Italian food did what Italy did. It stayed many. Every city, every valley, kept its own way of cooking, built on what grew nearby. The real cookbook was in the heads of grandmothers. And something new was arriving from the Americas. In the sixteen-nineties, a steward in Naples, Antonio Latini, published what may be the first printed recipe for tomato sauce. He called it, sauce in the Spanish style. Tomatoes, onion, chilli, thyme. It sounds almost like a salsa. Meanwhile, the Neapolitan poor were becoming famous for eating pasta in the street, with their hands. Travellers called them the macaroni eaters. But the Italian aristocracy? They wanted French. In the great houses of Naples and Sicily, the head cook was often French, or trained in the French way. People called him the monsù, from monsieur. The word survived in Sicily for two centuries. And in Turin, in seventeen sixty-six, a book appeared with a title that says it all. The Piedmontese Cook, Perfected in Paris. So by the eighteenth century, the direction had reversed. Italy had taught France. Now France was teaching Italy's rich. And Italy's poor, with their pasta and their tomatoes, were quietly inventing the cuisine the whole world would one day call Italian."}, {"slug": "07-riviera", "title": "Socca, farinata, pistou, pesto", "floor": "4 · The borderlands of the Maritime Alps", "look": "Nice was Italian until 1860. Chickpea pancakes, basil sauces, onion tarts and a sweet chard pie on both sides of a border that the food ignores.", "n": 7, "dur": 117, "text": "Now, let's travel to the border itself. The coast between Nice and Genoa. Here is a fact many visitors don't know. Until eighteen sixty, Nice was not French. It belonged to the House of Savoy, the same family that would soon rule all of Italy. Garibaldi, the hero of Italian unification, was born in Nice. He never forgave anyone for giving it to France. So it's no surprise that the food on both sides looks like the same family photograph. In the old town of Nice, people queue for socca. A huge, thin pancake of chickpea flour, water, and olive oil, baked in a wood oven in a copper pan, cut into rough pieces, and eaten with lots of black pepper. Drive two hours east, to Genoa, and it's called farinata. Same flour, same pan, same pepper. A Genoese legend says it was invented by accident, after a sea battle with Pisa, when bags of chickpea flour fell into salt water, and hungry sailors cooked the mush in the sun. Almost certainly not true. But very Ligurian. Then, basil. In Nice and Provence, pistou. Basil, garlic, olive oil, pounded together, and stirred into a summer vegetable soup. In Genoa, pesto. The same, plus pine nuts, and aged cheese. Both names come from the same gesture. To pound. The list goes on. An onion tart with anchovies and olives, pissaladière in Nice, sardenaira in Sanremo. Ravioli on both sides. And a chard pie that, in Nice, is sweet, with raisins and pine nuts. Even the little black olives are close relatives. On this coast, the border is a line on a map. The kitchen never signed the treaty."}, {"slug": "08-alps", "title": "Fondue and fonduta", "floor": "5 · Alpine crossings: Savoy and Aosta", "look": "One dynasty on both sides of the mountains, French spoken in the Aosta Valley, two melted-cheese traditions, and a dish invented by marketing.", "n": 8, "dur": 125, "text": "Go north now, up into the mountains. Savoy, on the French side. The Aosta Valley and Piedmont, on the Italian side. For centuries, they were ruled by the same family, the Dukes of Savoy. In fact, Savoy itself, the cradle of the dynasty, was handed to France in that same year, eighteen sixty, together with Nice. In the Aosta Valley, French is still an official language. And in the high villages on both sides, old people speak the same mountain dialect. Up here, the problem was always the same. Long winters. Snow closing the passes. Summer grass, high up, for only a few months. So you take the cows up, you make big, slow-ageing cheeses, and you keep them for the winter. In Savoy, Beaufort. In the Aosta Valley, Fontina. Both made from the milk of mountain cows, both best in summer, when the cows eat flowers. And what do you do with cheese in January? You melt it. In Savoy, fondue. Several cheeses melted with white wine and garlic. Bread on a long fork. Everyone around one pot. In the Aosta Valley and Piedmont, fonduta. Fontina melted with milk, butter, and egg yolks, smoother, richer. And in autumn, in Piedmont, with white truffle shaved on top. Both sides make polenta. Both drink a bitter herbal liqueur called génépi. And one small confession. Tartiflette, potatoes, bacon, and Reblochon cheese, the dish every ski tourist thinks is ancient? It was popularised in the nineteen-eighties, by the makers of Reblochon, to sell more Reblochon. Tradition, ACTUALLY, is sometimes younger than the skiers."}, {"slug": "09-escoffier", "title": "Escoffier and the brigade", "floor": "6 · The 19th-century codification", "look": "A boy from near Nice becomes the king of chefs: five mother sauces, a kitchen organised like an army, the Savoy and the Ritz. And his motto: make it simple.", "n": 9, "dur": 117, "text": "The nineteenth century. The century of steam, railways, grand hotels. And of one man who turned French cooking into a system. Auguste Escoffier was born in eighteen forty-six, in a village just west of Nice. Our border again. He started in his uncle's restaurant in Nice at thirteen. He cooked for the army in the Franco-Prussian war. And that experience gave him an idea. A great kitchen, he thought, should work like an army. With ranks. A chef at the top. A cook for sauces, one for fish, one for roasts, one for vegetables, one for pastry. Each with his station, each with his assistants. The brigade. With the hotelier César Ritz, he ran the kitchens of the Savoy in London, then the Ritz in Paris. Dukes, millionaires, singers. For the Australian soprano Nellie Melba, he created a dessert with peaches, vanilla ice cream and raspberry. Peach Melba. In nineteen-oh-three, he published his Guide Culinaire. Around five thousand recipes. And at its heart, a family tree. A few basic stocks. On top of them, five mother sauces. Béchamel, velouté, espagnole, hollandaise, tomato. And from those mothers, hundreds of daughters. He wrote, stock is everything in cooking. At least in French cooking. But here is the surprise. Escoffier thought the cooking before him was too heavy, too decorated, too much. His motto was two words. Faites simple. Make it simple. Simple, for Escoffier, still meant a sauce that took two days. But the instinct, we will see, was the right one."}, {"slug": "10-artusi", "title": "Artusi and the new Italy", "floor": "6 · The 19th-century codification", "look": "A retired silk merchant writes for families, not chefs; publishers refuse him; his book helps teach a new nation what Italian food is. He is buried at San Miniato.", "n": 10, "dur": 122, "text": "Now cross the Alps again. Same century, completely different story. In eighteen sixty-one, Italy becomes one country. On paper. A politician of the time said, we have made Italy. Now we must make Italians. People from Turin and Palermo could barely understand each other. They certainly didn't eat the same things. And the man who did a great deal to make them was not a chef. He was a retired silk merchant, living in Florence, with a cook, a manservant, and two cats. Pellegrino Artusi. He loved to eat, and he collected recipes, testing every one in his own kitchen. In his seventies, he wrote a book. Science in the Kitchen, and the Art of Eating Well. Publishers refused it. So in eighteen ninety-one, he paid to print a thousand copies himself. They sold slowly. Then, readers began to write to him. From all over Italy. With their own recipes, corrections, complaints. He added them. Edition after edition, the book grew, to almost eight hundred recipes. Now compare. Escoffier wrote for professional chefs, in grand hotels. Artusi wrote for families. For the lady of the house, and her cook. He was chatty, funny, full of stories and digressions. He had little patience for fashionable French terms. And he wrote in a clear Italian that people from every region could follow. Some historians say his book did as much to unite Italians as many novels. In many homes, it was the only book in the kitchen. Escoffier gave France a system. Artusi gave Italy a conversation. And if you climbed to San Miniato in Florence, you passed close to him. He is buried there, in the cemetery around the church."}, {"slug": "11-architecture", "title": "The French cathedral", "floor": "7 · Classical architecture vs ingredient minimalism", "look": "Stocks as foundations, sauces as structure, butter as mortar. And the butter line that runs through France itself.", "n": 11, "dur": 114, "text": "So we have two books, two countries, and underneath them, two philosophies. Let's look at them carefully. Start with a French word. Fond. It means stock. But it also means foundation. The bottom of things. That is the key to classical French cooking. It is built like a cathedral. At the bottom, the foundations: stocks, simmered for hours from bones and vegetables. On them, the walls: the mother sauces. Then the decoration: a reduction, a little cream, a spoon of cold butter whisked in at the last second, to make the sauce shine. In this system, the ingredient matters, of course. But it is raw material. The cook transforms it. The genius is in the transformation. A French chef might say, anyone can serve a good tomato. Show me what you can MAKE of it. And the mortar of the cathedral is butter. But be careful. France is not one kitchen either. Draw a line across the country. North of it, Normandy, Brittany, Paris, butter and cream. South of it, Provence and the Riviera, olive oil, garlic, tomatoes, herbs. And in the southwest, duck fat. The classical French kitchen, the one that conquered the world, is the kitchen of the north, of Paris, of the court. The south of France, in many ways, has always cooked more like Italy. And one more thing. This system was designed to be TAUGHT. Anyone, anywhere, can learn to make a velouté. That is why French technique became the grammar of professional kitchens, from New York to Tokyo."}, {"slug": "12-ingredient", "title": "The Italian market", "floor": "7 · Classical architecture vs ingredient minimalism", "look": "Start from what is in season; subtract, don't add. Many oils, northern butter, and why three ingredients can be the hardest dish of all.", "n": 12, "dur": 119, "text": "Now the Italian kitchen. And here, the starting point is not the stock pot. It is the market. An Italian cook asks first, what is good today? What is in season? What grows here? And then tries to do as little as possible to it. A ripe tomato, a leaf of basil, good oil, salt. A Florentine steak, salt, fire. Raw artichokes, shaved thin, lemon, cheese. If the ingredient is perfect, the cook's job is to stay out of the way. Remember the French writer who said a cabbage soup should taste of cabbage? Italy took that sentence and made it a religion. And the fat? Olive oil, but not one olive oil. Tuscany's is green and peppery. Liguria's is soft and gentle. Puglia's, fruity and strong. Italians match the oil to the dish the way the French match a wine. And yet, careful again. The north of Italy cooks with butter. A risotto in Milan is finished with butter and cheese, stirred hard at the end. They call it mantecatura. It is not so far from a French chef whisking butter into a sauce. Here is the secret that tourists miss. Simple is not easy. Cacio e pepe, from Rome. Pasta, pecorino cheese, black pepper. Three ingredients. And one of the hardest dishes in Italy. Get the temperature wrong, and the cheese turns into lumps. So here is the difference, in one sentence. French cooking adds, to build something new. Italian cooking subtracts, until only the essential is left. And both of them, in their own way, are chasing the same thing. The perfect bite."}, {"slug": "13-nouvelle", "title": "Nouvelle cuisine", "floor": "8 · Post-war rebellions", "look": "Lighter sauces, shorter cooking, the plate as a canvas: the French rebellion of the 1970s, and the Milanese chef who brought it to Italy.", "n": 13, "dur": 113, "text": "After the Second World War, both countries had a problem. In France, the problem was Escoffier. Or rather, his heirs. By the nineteen-sixties, grand French restaurants could feel like museums. The same heavy sauces, the same flour-thickened gravies, the same dishes, repeated for sixty years. Then, a group of young chefs rebelled. Paul Bocuse, near Lyon. The Troisgros brothers, in Roanne, with their famous salmon in sorrel sauce. Michel Guérard, who invented a cuisine for slimming. Roger Vergé, on the Riviera, with his cuisine of the sun. In nineteen seventy-three, two food critics, Gault and Millau, gave the movement a name, and ten commandments. Don't overcook. Use fresh, local products. Shorter menus. Lighter sauces, no more flour. Be inventive. Nouvelle cuisine. Notice something? Fresh products. Short cooking. Letting the ingredient speak. Many of these ideas were what Italian grandmothers had always done. Some of the rebels said so openly. Then the influence flowed back. A young Milanese cook, Gualtiero Marchesi, trained in France, including with the Troisgros. In nineteen seventy-seven, he opened a restaurant in Milan, and cooked Italian food with French discipline and modern eyes. A risotto with saffron, topped with a single square of gold leaf. In the mid-eighties, he became the first chef in Italy to earn three Michelin stars. And almost every great Italian chef of the next generation passed through his kitchen."}, {"slug": "14-slowfood", "title": "Slow Food", "floor": "8 · Post-war rebellions", "look": "Pasta handed out by the Spanish Steps, a snail for a symbol, and a movement that defends cheeses, beans and ways of life.", "n": 14, "dur": 117, "text": "Italy's rebellion was different. It was not against the old chefs. It was against the future. In the decades after the war, Italy changed faster than almost any country in Europe. Peasants moved to factory cities. Supermarkets arrived. Industrial food arrived. And old recipes, old cheeses, old varieties of beans and apples, began to disappear. In nineteen eighty-six, a fast-food restaurant opened right by the Spanish Steps in Rome. There were protests. And a journalist from a small town in Piedmont, Carlo Petrini, had an idea. Not to fight fast food with anger. To fight it with pleasure. Its opposite would be slow food. And its symbol, a snail. In nineteen eighty-nine, the movement signed its manifesto. And, nicely, it signed it in Paris. Slow Food did not tell people how to cook. It asked different questions. Who grew this? Where? Is it disappearing? It built a catalogue of endangered foods, a kind of Noah's Ark for flavours. It supported small producers. It even founded a university of gastronomy, in Piedmont. France, in its own way, had started the same fight much earlier, with its system of protected names. Roquefort was protected in the nineteen-twenties. Champagne, Bresse chickens, Comté. The law, defending the land. So, two rebellions. The French one changed the plate. The Italian one changed the shopping basket. And today, each country has adopted the other's. French chefs talk endlessly about small farmers. And Italian chefs plate like painters."}, {"slug": "15-crosspollination", "title": "Three stars, both directions", "floor": "9 · Modern cross-pollination", "look": "Alain Ducasse cooks the Riviera in Monaco; Massimo Bottura learns there, then reinvents Parmigiano. French kitchens borrow simplicity, Italian ones borrow discipline.", "n": 15, "dur": 114, "text": "Now, the top of the pyramid. Three-star restaurants. And here the borders have almost dissolved. Start on the Riviera, of course. In nineteen eighty-seven, a young French chef, Alain Ducasse, took over the restaurant of the Hôtel de Paris, in Monaco. Within three years, it had three stars. And what did he cook? Not Parisian sauces. The food of the coast between Nice and Genoa. Vegetables, olive oil, fish, herbs. French technique, Ligurian soul. One of the young cooks in that kitchen was from Modena. Massimo Bottura. He went home, and opened Osteria Francescana. He took the most Italian of ingredients, Parmigiano Reggiano, and served it in five textures, at five different ages. He called one dessert, Oops, I dropped the lemon tart. It was voted the best restaurant in the world, twice. This is the pattern today. The best French kitchens borrow Italian ideas. Fewer elements on the plate. Olive oil instead of butter. A raw fish, a citrus, a leaf. Some Paris restaurants now serve burrata as if it were a local cheese. And the best Italian kitchens borrow French discipline. The brigade. Precise reductions. Sauces made the classical way. And above all, pastry. Many of Italy's top pastry chefs trained in French techniques: the layered doughs, the glazes, the mirror-smooth cakes. A young cook today, in Lyon or in Turin, might learn sauces like Escoffier, and think about ingredients like Artusi. The two philosophies are no longer rivals. They are tools in the same drawer."}, {"slug": "16-today", "title": "Paris, Milan and the question of authenticity", "floor": "10 · The contemporary global identity", "look": "Natural wine, couscous and Japanese chefs in Paris, Chinatown and Egyptian pizza makers in Milan, and the argument between precision and authenticity. A last word.", "n": 16, "dur": 130, "text": "Our last episode. Paris and Milan, today. Walk into a small bistro in Paris, and the wine list may say, natural. Wines with almost nothing added, cloudy, lively, sometimes strange. The movement grew from a few winemakers in Beaujolais, and Paris made it a fashion. In Italy, its home is again on a border. In Friuli, next to Slovenia, winemakers age white wine on its skins, some in clay jars from Georgia, and make orange wine. And who cooks in these cities now? In Paris, couscous regularly appears among the nation's favourite dishes. Vietnamese soup in the thirteenth arrondissement. And in twenty-twenty, a Japanese chef, Kei Kobayashi, won three stars, cooking French food in Paris. In Milan, the oldest Chinatown in Italy. Peruvian ceviche. And many of the pizza makers, in Milan and across Italy, are Egyptian. Which brings us to the great argument of our time. Precision, or authenticity? The French tradition says, technique can be learned by anyone. If a Japanese chef masters the sauce, it is French cooking. The Italian tradition says, a dish belongs to a place. To a grandmother. Don't touch carbonara. Although, carbonara appears in print only in the early nineteen-fifties. Many traditions are younger than we think. So, after two thousand years, where are we? Two sisters, with the same Roman mother. Italy taught France to eat with elegance. France taught the world to cook with method. Each keeps stealing from the other, and pretending it didn't. France asks, how should this be cooked? Italy asks, where does this come from? The best cooks today ask both questions. Thank you for listening to Butter and Olive Oil. Buon appetito. And bon appétit."}];
+const CACHE = "cuisine-podcast-v1";
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+const url = t => `audio/cuisine/${t.slug}.mp3`;
+const num = i => String(TRACKS[i].n);
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let heard = new Set(store.get("cuisine-heard", []));
+let current = store.get("cuisine-current", 0);
+let blobUrl = null, wakeLock = null;
+$("auto").checked = store.get("cuisine-auto", true);
+$("auto").onchange = () => store.set("cuisine-auto", $("auto").checked);
+
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+function render() {
+  const playing = !audio.paused;
+  $("keys").innerHTML = TRACKS.map((t, i) => `<button type="button" data-i="${i}" class="${i === current && audio.src ? "now" : heard.has(i) ? "heard" : ""}" aria-label="Episode ${t.n}: ${esc(t.title)}">${num(i)}</button>`).join("");
+  let html = "", floor = null;
+  TRACKS.forEach((t, i) => {
+    if (t.floor !== floor) { if (floor !== null) html += "</ol>"; floor = t.floor; html += `<h2>${esc(floor)}</h2><ol class="tracks">`; }
+    const now = i === current && audio.src;
+    html += `<li class="track ${now ? "now" : ""} ${heard.has(i) ? "heard" : ""}" id="t-${i}">
+      <span class="no">${num(i)}</span>
+      <div style="min-width:0">
+        <h3>${esc(t.title)}</h3>
+        <div class="meta">${fmt(t.dur)}${heard.has(i) ? " · ✓ heard" : ""}</div>
+        <p class="look">${esc(t.look)}</p>
+        <details><summary>Read along</summary><p>${esc(t.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${i}" aria-label="${now && playing ? "Pause" : "Play"} track ${i}">${now && playing ? pauseSvg : playSvg}</button></li>`;
+  });
+  $("list").innerHTML = html + "</ol>";
+  document.querySelectorAll("#keys button, .track .play").forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (i === current && audio.src && !audio.paused) audio.pause(); else play(i, b.closest("#keys") !== null);
+  });
+  const t = TRACKS[current];
+  $("pTitle").textContent = `${num(current)} · ${t.title}`;
+  $("pFloor").textContent = audio.src ? t.floor : "Press play";
+  $("ppIcon").innerHTML = playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l13-7.5z"/>';
+  $("ppBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
+  $("prevBtn").disabled = current === 0; $("nextBtn").disabled = current === TRACKS.length - 1;
+}
+
+async function sourceFor(t) {
+  // Use the copy saved on the phone when there is one, so tracks play without signal.
+  try {
+    if ("caches" in window) {
+      const hit = await (await caches.open(CACHE)).match(url(t));
+      if (hit) { if (blobUrl) URL.revokeObjectURL(blobUrl); blobUrl = URL.createObjectURL(await hit.blob()); return blobUrl; }
+    }
+  } catch (e) {}
+  return url(t);
+}
+async function play(i, scroll) {
+  current = i; store.set("cuisine-current", i);
+  const t = TRACKS[i];
+  audio.src = await sourceFor(t);
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: `${num(i)} · ${t.title}`, artist: "Florence on Foot", album: "Butter and Olive Oil" });
+  audio.play().catch(() => {});
+  keepAwake();
+  render();
+  if (scroll) $("t-" + i).scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("ppBtn").onclick = () => { if (!audio.src) play(current, true); else if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+$("prevBtn").onclick = () => { if (current > 0) play(current - 1, true); };
+$("nextBtn").onclick = () => { if (current < TRACKS.length - 1) play(current + 1, true); };
+if ("mediaSession" in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler("previoustrack", () => $("prevBtn").onclick());
+    navigator.mediaSession.setActionHandler("nexttrack", () => $("nextBtn").onclick());
+  } catch (e) {}
+}
+audio.addEventListener("play", render);
+audio.addEventListener("pause", render);
+audio.addEventListener("timeupdate", () => {
+  if (!audio.duration) return;
+  $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`;
+  $("pCur").textContent = fmt(audio.currentTime); $("pDur").textContent = fmt(audio.duration);
+});
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  heard.add(current); store.set("cuisine-heard", [...heard]);
+  if ($("auto").checked && current < TRACKS.length - 1) play(current + 1, true);
+  else { $("pFill").style.width = "100%"; render(); }
+});
+async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); } } catch (e) {} }
+$("resetBtn").onclick = () => { heard = new Set(); store.set("cuisine-heard", []); render(); };
+
+/* ---------- offline ---------- */
+async function checkOffline() {
+  try {
+    if (!("caches" in window)) { $("offline").hidden = true; return; }
+    const c = await caches.open(CACHE); const keys = await c.keys();
+    if (keys.length >= TRACKS.length) { $("offline").classList.add("done"); $("offTxt").innerHTML = "<b>✓ Saved on this phone.</b> All episodes play without internet."; $("offBtn").hidden = true; }
+  } catch (e) { $("offline").hidden = true; }
+}
+$("offBtn").onclick = async () => {
+  $("offBtn").disabled = true;
+  try {
+    const c = await caches.open(CACHE); let done = 0;
+    for (const t of TRACKS) {
+      if (!(await c.match(url(t)))) { const r = await fetch(url(t)); if (!r.ok) throw new Error(r.status); await c.put(url(t), r); }
+      done++; $("offBtn").textContent = `Saving… ${done}/${TRACKS.length}`;
+    }
+    checkOffline();
+  } catch (e) {
+    $("offBtn").disabled = false; $("offBtn").textContent = "⬇ Try again";
+    $("offTxt").innerHTML = "<b>Saving stopped.</b> The connection dropped. Tap Try again; tracks already saved are kept.";
+  }
+};
+checkOffline();
+render();
+</script>
+</body>
+</html>
