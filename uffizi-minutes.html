@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Uffizi in Minutes</title>
+<meta name="description" content="A one-minute-per-masterpiece audio guide to the Uffizi: 16 tracks from Giotto to Artemisia Gentileschi.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a museum audio-guide handset. Number keys on top, tracks grouped by floor, a docked player.
+     Same marble palette as Florence on Foot; the gold accent stands for the gold-ground altarpieces. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --green: #2f6b57;
+    --gold: #9a6d14;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: max(20px, env(safe-area-inset-top, 0px)) 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+  .back { color: var(--green); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1.1; margin: 2px 0 6px; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 400; font-size: 1.35rem; margin: 6px 0 0; }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible, .track:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+  .offline { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--chip); border-radius: 14px; padding: 12px 14px; }
+  .offline p { margin: 0; flex: 1 1 220px; min-width: 0; font-size: .92rem; }
+  .offline.done { background: color-mix(in srgb, var(--green) 12%, var(--panel)); }
+
+  .keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 8px; }
+  .keys button { padding: 0; height: 48px; border-radius: 12px; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .keys button.heard { color: var(--muted); background: var(--chip); }
+  .keys button.now { background: var(--green); border-color: var(--green); color: #fff; }
+
+  ol.tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .track { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: start; scroll-margin-top: 16px; scroll-margin-bottom: 140px; }
+  .track.now { border-color: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 25%, transparent); }
+  .no { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--ink); color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track.heard .no { background: var(--muted); }
+  .track.now .no { background: var(--green); }
+  .track h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track p.look { margin: 6px 0 0; font-size: .93rem; }
+  .track details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .track summary { cursor: pointer; font-weight: 600; color: var(--green); }
+  .track details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .player .row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; align-items: center; }
+  .ctrls { display: flex; gap: 6px; align-items: center; }
+  .ctrls button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); }
+  .ctrls .pp { width: 52px; height: 52px; background: var(--green); color: #fff; }
+  .ctrls svg { width: 18px; height: 18px; } .ctrls .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--green); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .time label { display: inline-flex; gap: 6px; align-items: center; }
+  .time input { width: 16px; height: 16px; accent-color: var(--green); margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <div class="eyebrow" style="margin-top:10px">Galleria degli Uffizi · one minute per masterpiece</div>
+    <h1>Uffizi in Minutes</h1>
+    <p class="lede">Sixteen one-minute tracks on the masterpieces you should not miss, from Giotto's golden Madonna to Artemisia Gentileschi, each with a small detail to find. About 15 minutes in all. Tap the number of the work in front of you, or play them in order.</p>
+  </header>
+
+  <div class="offline" id="offline">
+    <p id="offTxt"><b>Signal can be weak inside.</b> Save all tracks to this phone now (21 MB) so they play without internet.</p>
+    <button type="button" id="offBtn">⬇ Save for offline</button>
+  </div>
+
+  <section>
+    <div class="eyebrow" style="margin-bottom:8px">Jump to track</div>
+    <div class="keys" id="keys" role="group" aria-label="Track numbers"></div>
+  </section>
+
+  <div id="list"></div>
+
+  <p class="fine">Narration made with ElevenLabs. Rooms are sometimes rearranged or closed: if a work is not where you expect, ask a guard or check the museum map. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <div class="row">
+      <div class="ctrls">
+        <button type="button" id="prevBtn" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button type="button" class="pp" id="ppBtn" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+        <button type="button" id="nextBtn" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      </div>
+      <div style="min-width:0">
+        <div class="t" id="pTitle">00 · Welcome to the Uffizi</div>
+        <div class="meta" id="pFloor">Press play to start</div>
+      </div>
+    </div>
+    <div class="bar" id="pBar"><i id="pFill"></i></div>
+    <div class="time"><span id="pCur">0:00</span><label><input type="checkbox" id="auto"> Play next track automatically</label><span id="pDur"></span></div>
+  </div>
+</div>
+<audio id="audio" preload="none"></audio>
+
+<script>
+const TRACKS = [{"slug": "00-welcome", "title": "Welcome to the Uffizi", "floor": "Second floor", "look": "Start at the top of the stairs, in the long corridor.", "dur": 59, "text": "Welcome to the Uffizi, dear friends. One minute per masterpiece. The main collection is on the second floor. At the top of the stairs, you are in a long corridor, lined with ancient Roman statues. Now, first challenge: look UP. The ceiling is covered with tiny painted creatures: birds, monsters, dancing figures. Every section is different. Find the strangest creature you can, and show it to each other. The building was designed in the fifteen-sixties as offices, uffizi, for the Medici government. And for two centuries, the family filled it with art. The rooms open off this corridor, roughly in time order. So walking through the Uffizi is like walking through the Renaissance, step by step. Play the next track when you stand in front of three giant golden Madonnas."}, {"slug": "01-maesta", "title": "Three golden Madonnas", "floor": "Second floor", "look": "Three huge gold altarpieces in one of the first rooms: Cimabue, Duccio, Giotto.", "dur": 54, "text": "Three huge golden altarpieces. The same subject: the Madonna enthroned, with the Child and angels. Let's play spot the difference. Look at Cimabue's, from around twelve eighty. Beautiful, golden... and flat. Like an icon. Now look at Giotto's, from around thirteen ten. Find her knees. You CAN see them, can't you? Under the robe, there is a body. She sits, with weight, on a real throne. The angels look at her from the side. In a single generation, painting began to look at the real world. Dante noticed it too. He wrote that Cimabue thought he ruled the field of painting... and now, Giotto had all the fame. This room is where the whole story begins."}, {"slug": "02-martini", "title": "Simone Martini's Annunciation", "floor": "Second floor", "look": "A dazzling gold altarpiece from Siena, 1333, with pointed arches.", "dur": 55, "text": "Simone Martini's Annunciation, from Siena, thirteen thirty-three. The angel Gabriel has just landed, still kneeling, his cloak still fluttering. Now look at Mary. Is she happy? NOT at all. She pulls back, clutching her cloak, as if to say: excuse me... who are you? And now, find the words. Look at the space between them. The angel's greeting is engraved in the gold, coming straight out of his mouth: Ave gratia plena. Hail, full of grace. A medieval speech bubble. Gold leaf, and blue made from crushed lapis lazuli, the most expensive colour in the world. It was made to glow by candlelight, in the cathedral of Siena."}, {"slug": "03-urbino", "title": "The Duke and Duchess of Urbino", "floor": "Second floor", "look": "Two profile portraits facing each other, by Piero della Francesca.", "dur": 52, "text": "Two portraits, face to face. The Duke and Duchess of Urbino, by Piero della Francesca. A question. Why do we only see the duke from his LEFT side? Because he lost his right eye in a tournament. And look at the strange dip at the top of his nose. The story says he had part of it removed, so that he could see better with his one good eye. His wife, Battista Sforza, is very pale. She died young, at twenty-six, and this portrait was probably painted after her death. So they look at each other... forever. Now look behind them: hills, rivers, lakes, fading into blue. And walk round the back. The panels are painted on both sides."}, {"slug": "04-lippi", "title": "Filippo Lippi's Madonna: a love story", "floor": "Second floor", "look": "A Madonna in profile with a transparent veil, and an angel grinning out at you.", "dur": 55, "text": "Now, a love story. Find a Madonna in profile, with a delicate, transparent veil. And at the bottom, an angel, looking out at you with a cheeky grin. The painter, Filippo Lippi, was a monk. A REALLY bad monk. While painting for a convent, he fell in love with a young nun, Lucrezia Buti. And they ran away together. They had a son, Filippino, who became a fine painter too. And tradition says that Lucrezia is the model for this Madonna. So this may be the portrait of a woman, painted by the man who loved her. Look at the face again. Do you see it? The Medici later asked the pope to release them from their vows. Historians still argue whether they ever married."}, {"slug": "05-primavera", "title": "Botticelli: Primavera", "floor": "Second floor", "look": "The big dark orange grove full of figures, in the Botticelli rooms.", "dur": 51, "text": "The Botticelli rooms. Take a breath. This is Primavera. Spring. And the secret is to read it from RIGHT to left. On the far right, a blue-green wind god, Zephyr, grabs a nymph. Flowers spill from her mouth... and she becomes Flora, the goddess of spring, in her flowered dress. In the middle, Venus. Above her, Cupid, blindfolded, aiming his arrow at the three Graces, dancing. And on the far left, Mercury, poking the clouds with his stick, paying no attention to anyone. Now, a challenge. Look down at the meadow. How many different flowers can you find? Botanists have counted around one hundred and ninety. Many of them still grow in the hills around Florence."}, {"slug": "06-venus", "title": "Botticelli: The Birth of Venus", "floor": "Second floor", "look": "Venus standing on a shell, blown ashore by the winds.", "dur": 54, "text": "And here she is. The Birth of Venus. Born from the sea foam, she arrives on the shore, standing on a scallop shell. The winds blow her in from the left; a nymph rushes from the right with a flowered cloak. Now, look closely at her. Her neck is too long. Her left shoulder slopes impossibly. Could she REALLY stand like that? No. And it doesn't matter. Botticelli was not painting a woman. He was painting an idea of beauty. Legend says her face is Simonetta Vespucci, the most admired woman in Florence, who died at twenty-two. Botticelli asked to be buried near her. And he was. Step back, and watch how she seems to float."}, {"slug": "07-leonardo", "title": "Leonardo's room", "floor": "Second floor", "look": "Three works: the Baptism of Christ, the Annunciation, and the unfinished Adoration of the Magi.", "dur": 59, "text": "Leonardo's room. Three paintings, three stories. First, the Baptism of Christ, by his teacher Verrocchio. Find the two angels in the bottom left corner. The one on the far left, turning his head, is by the young Leonardo. The story says that when Verrocchio saw it, he gave up painting. Probably NOT true. But look at those curls, and you understand the legend. Second, the Annunciation, painted when Leonardo was about twenty. Look at the angel's wings. Real bird wings. He studied birds all his life. Third, the Adoration of the Magi: brown, unfinished, swirling. He left for Milan before he could finish it. Look closely: you are looking straight into Leonardo's drawing, into his mind."}, {"slug": "08-tribuna", "title": "The Tribuna", "floor": "Second floor", "look": "The octagonal red room with a dome of shells. Look in from the doorways.", "dur": 50, "text": "The Tribuna. An eight-sided room, with red walls and a glittering dome. You can't walk in, but you can look from the doorways. Look up. The dome is covered with thousands of mother-of-pearl shells. It was built in the fifteen-eighties as the Medici treasure room. And it was designed around the four elements: air, water, fire, and earth. Can you guess which is which? The shells, water. The red walls, fire. The lantern at the top, air. And the inlaid stone floor, earth. In the centre stands the ancient Medici Venus. For young aristocrats on the Grand Tour, standing in THIS room was the high point of their whole journey to Italy."}, {"slug": "09-window", "title": "The view of Ponte Vecchio", "floor": "Second floor", "look": "The windows in the short corridor above the river, between the two wings.", "dur": 46, "text": "Pause here, at the windows in the short corridor above the river. Look out. The Ponte Vecchio, with its little shops hanging over the water. Now, find a long row of small windows ABOVE the shops. That is the Vasari Corridor. A private passage, almost a kilometre long, built in fifteen sixty-five, so the Medici could walk from their offices here, across the river, to their palace... without ever mixing with the crowd below. It was built for a wedding: Francesco de' Medici's marriage to Joanna of Austria. And it was built in about five months. Take a moment here, the two of you. Most people rush right past one of the best views in Florence."}, {"slug": "10-doni-tondo", "title": "Michelangelo: the Doni Tondo", "floor": "Second floor", "look": "A round painting in a spectacular carved gold frame.", "dur": 58, "text": "Find a round painting, in a spectacular carved gold frame. The Doni Tondo, by Michelangelo. It was a wedding present, around fifteen-oh-five, for Agnolo Doni and Maddalena Strozzi. And there is a story about the bill. Michelangelo asked for seventy ducats. Doni thought it was too much, and sent forty. So Michelangelo sent the painting back... and demanded a hundred. In the end, Doni paid one hundred and forty. Never argue with Michelangelo. Look at Mary, twisting to lift the Child over her shoulder, with the arms of a sculptor's model. And the colours: pink, orange, green, almost electric. It is the only finished panel painting by Michelangelo that survives. Imagine receiving THAT as a wedding present."}, {"slug": "11-raphael", "title": "Raphael: the Madonna of the Goldfinch", "floor": "Second floor", "look": "A gentle Madonna in a green meadow, two boys, and a tiny bird.", "dur": 56, "text": "Find a gentle Madonna in a green meadow, with two little boys, and a tiny bird. The Madonna of the Goldfinch, by Raphael. He was about twenty-two. Can you find the bird? Little John the Baptist offers it to the Child. The goldfinch feeds among thorns, so it was a symbol of the Passion. A shadow of the future, in a sweet scene. This was a wedding present too, for Raphael's friend Lorenzo Nasi. Then, in the fifteen-forties, the Nasi house collapsed in a landslide, and the painting broke into seventeen pieces. It was nailed back together. A ten-year restoration, finished in two thousand and eight, brought back these colours. Michelangelo or Raphael? Fire or tenderness? Which wedding present would you choose?"}, {"slug": "12-titian", "title": "Titian: the Venus of Urbino", "floor": "First floor", "look": "A reclining nude woman in a palace bedroom, looking straight at you.", "dur": 59, "text": "On the first floor, find a reclining woman, looking straight at you. Titian's Venus of Urbino, from fifteen thirty-eight. Unlike Botticelli's, she is not a goddess on a shell. She is in a real bedroom, in a real palace. Now, read the clues. Find the little dog, asleep at her feet. Fidelity. The roses in her hand: love. And in the background, two maids searching in a big wooden chest, a wedding chest, a cassone. This painting is often linked to a marriage. Not everyone approved. Mark Twain called her the foulest, the vilest, the obscenest picture the world possesses. Which, of course, made everyone want to see her even more."}, {"slug": "13-caravaggio", "title": "Caravaggio", "floor": "First floor", "look": "The Medusa shield and the young Bacchus, in dramatic light and shadow.", "dur": 56, "text": "Caravaggio. Find the paintings with dramatic light, and deep shadows. First, the Medusa. It is painted on a real, round, curved parade shield, a gift for the Grand Duke Ferdinando de' Medici. Her head has just been cut off, and she is still screaming. Many believe the face is Caravaggio's own. Then, the young Bacchus, offering you a glass of wine. Look at his dirty fingernails, and the slightly rotten fruit. And now, the challenge. Find the glass carafe of wine, bottom left. Look VERY closely at the reflection. Researchers found a tiny figure there, thought to be Caravaggio himself, at his easel. A selfie, four hundred years early."}, {"slug": "14-artemisia", "title": "Artemisia Gentileschi", "floor": "First floor", "look": "Judith Slaying Holofernes, near the Caravaggios.", "dur": 58, "text": "Now, one of the most powerful paintings in the museum. Judith Slaying Holofernes, by Artemisia Gentileschi. It is violent. Judith and her maid hold down the general, and Judith cuts his throat. Blood spurts across the sheets. Look at Judith's arms. Strong. Steady. She does NOT hesitate. Artemisia painted it around sixteen twenty. Some years before, in Rome, she had been raped by a painter who worked with her father. At the trial, she herself was tortured, to test whether she was telling the truth. She never changed her story. In Florence, she became the first woman admitted to the Academy of the Arts of Drawing. Four hundred years later, she is finally as famous as she deserves to be."}, {"slug": "15-goodbye", "title": "Why it is all still here", "floor": "Exit", "look": "On your way out.", "dur": 57, "text": "Before you leave, one last story. Why is all of this still here, in Florence? In seventeen thirty-seven, the last Medici grand duke died without children. Tuscany passed to a foreign family. And the collections could have been scattered all over Europe. But one Medici was left: his sister, Anna Maria Luisa. She left everything, paintings, statues, jewels, books, to the new rulers. On ONE condition. That none of it would ever leave Florence. That it would stay here, for the public, and for visitors from every nation. So, dear friends, in a way, she left it to you. When you go out, the Ponte Vecchio is just to your right. Grazie, and enjoy Florence."}];
+const CACHE = "uffizi-minutes-v1";
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+const url = t => `audio/uffizi-v2/${t.slug}.mp3`;
+const num = i => String(i).padStart(2, "0");
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let heard = new Set(store.get("uffmin-heard", []));
+let current = store.get("uffmin-current", 0);
+let blobUrl = null, wakeLock = null;
+$("auto").checked = store.get("uffmin-auto", false);
+$("auto").onchange = () => store.set("uffmin-auto", $("auto").checked);
+
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+function render() {
+  const playing = !audio.paused;
+  $("keys").innerHTML = TRACKS.map((t, i) => `<button type="button" data-i="${i}" class="${i === current && audio.src ? "now" : heard.has(i) ? "heard" : ""}" aria-label="Track ${i}: ${esc(t.title)}">${num(i)}</button>`).join("");
+  let html = "", floor = null;
+  TRACKS.forEach((t, i) => {
+    if (t.floor !== floor) { if (floor !== null) html += "</ol>"; floor = t.floor; html += `<h2>${esc(floor)}</h2><ol class="tracks">`; }
+    const now = i === current && audio.src;
+    html += `<li class="track ${now ? "now" : ""} ${heard.has(i) ? "heard" : ""}" id="t-${i}">
+      <span class="no">${num(i)}</span>
+      <div style="min-width:0">
+        <h3>${esc(t.title)}</h3>
+        <div class="meta">${fmt(t.dur)}${heard.has(i) ? " · ✓ heard" : ""}</div>
+        <p class="look">${esc(t.look)}</p>
+        <details><summary>Read along</summary><p>${esc(t.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${i}" aria-label="${now && playing ? "Pause" : "Play"} track ${i}">${now && playing ? pauseSvg : playSvg}</button></li>`;
+  });
+  $("list").innerHTML = html + "</ol>";
+  document.querySelectorAll("#keys button, .track .play").forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (i === current && audio.src && !audio.paused) audio.pause(); else play(i, b.closest("#keys") !== null);
+  });
+  const t = TRACKS[current];
+  $("pTitle").textContent = `${num(current)} · ${t.title}`;
+  $("pFloor").textContent = audio.src ? t.floor : "Press play to start";
+  $("ppIcon").innerHTML = playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l13-7.5z"/>';
+  $("ppBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
+  $("prevBtn").disabled = current === 0; $("nextBtn").disabled = current === TRACKS.length - 1;
+}
+
+async function sourceFor(t) {
+  // Use the copy saved on the phone when there is one, so tracks play without signal.
+  try {
+    if ("caches" in window) {
+      const hit = await (await caches.open(CACHE)).match(url(t));
+      if (hit) { if (blobUrl) URL.revokeObjectURL(blobUrl); blobUrl = URL.createObjectURL(await hit.blob()); return blobUrl; }
+    }
+  } catch (e) {}
+  return url(t);
+}
+async function play(i, scroll) {
+  current = i; store.set("uffmin-current", i);
+  const t = TRACKS[i];
+  audio.src = await sourceFor(t);
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: `${num(i)} · ${t.title}`, artist: "Florence on Foot", album: "Uffizi in Minutes" });
+  audio.play().catch(() => {});
+  keepAwake();
+  render();
+  if (scroll) $("t-" + i).scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("ppBtn").onclick = () => { if (!audio.src) play(current, true); else if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+$("prevBtn").onclick = () => { if (current > 0) play(current - 1, true); };
+$("nextBtn").onclick = () => { if (current < TRACKS.length - 1) play(current + 1, true); };
+if ("mediaSession" in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler("previoustrack", () => $("prevBtn").onclick());
+    navigator.mediaSession.setActionHandler("nexttrack", () => $("nextBtn").onclick());
+  } catch (e) {}
+}
+audio.addEventListener("play", render);
+audio.addEventListener("pause", render);
+audio.addEventListener("timeupdate", () => {
+  if (!audio.duration) return;
+  $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`;
+  $("pCur").textContent = fmt(audio.currentTime); $("pDur").textContent = fmt(audio.duration);
+});
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  heard.add(current); store.set("uffmin-heard", [...heard]);
+  if ($("auto").checked && current < TRACKS.length - 1) play(current + 1, true);
+  else { $("pFill").style.width = "100%"; render(); }
+});
+async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); } } catch (e) {} }
+$("resetBtn").onclick = () => { heard = new Set(); store.set("uffmin-heard", []); render(); };
+
+/* ---------- offline ---------- */
+async function checkOffline() {
+  try {
+    if (!("caches" in window)) { $("offline").hidden = true; return; }
+    const c = await caches.open(CACHE); const keys = await c.keys();
+    if (keys.length >= TRACKS.length) { $("offline").classList.add("done"); $("offTxt").innerHTML = "<b>✓ Saved on this phone.</b> All 16 tracks play without internet."; $("offBtn").hidden = true; }
+  } catch (e) { $("offline").hidden = true; }
+}
+$("offBtn").onclick = async () => {
+  $("offBtn").disabled = true;
+  try {
+    const c = await caches.open(CACHE); let done = 0;
+    for (const t of TRACKS) {
+      if (!(await c.match(url(t)))) { const r = await fetch(url(t)); if (!r.ok) throw new Error(r.status); await c.put(url(t), r); }
+      done++; $("offBtn").textContent = `Saving… ${done}/${TRACKS.length}`;
+    }
+    checkOffline();
+  } catch (e) {
+    $("offBtn").disabled = false; $("offBtn").textContent = "⬇ Try again";
+    $("offTxt").innerHTML = "<b>Saving stopped.</b> The connection dropped. Tap Try again; tracks already saved are kept.";
+  }
+};
+checkOffline();
+render();
+</script>
+</body>
+</html>
