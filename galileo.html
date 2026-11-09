@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Museo Galileo Guide</title>
+<meta name="description" content="An audio guide to the Museo Galileo in Florence: a 10-minute introduction and 15 two-minute stops, room by room.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a museum audio-guide handset. Number keys on top, tracks grouped by floor, a docked player.
+     Same marble palette as Florence on Foot; the gold accent stands for the gold-ground altarpieces. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --green: #2f6b57;
+    --gold: #9a6d14;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: max(20px, env(safe-area-inset-top, 0px)) 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+  .back { color: var(--green); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1.1; margin: 2px 0 6px; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 400; font-size: 1.35rem; margin: 6px 0 0; }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible, .track:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+  .offline { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--chip); border-radius: 14px; padding: 12px 14px; }
+  .offline p { margin: 0; flex: 1 1 220px; min-width: 0; font-size: .92rem; }
+  .offline.done { background: color-mix(in srgb, var(--green) 12%, var(--panel)); }
+
+  .keys { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .keys button { padding: 0; height: 48px; border-radius: 12px; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .keys button.heard { color: var(--muted); background: var(--chip); }
+  .keys button.now { background: var(--green); border-color: var(--green); color: #fff; }
+
+  ol.tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .track { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: start; scroll-margin-top: 16px; scroll-margin-bottom: 140px; }
+  .track.now { border-color: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 25%, transparent); }
+  .no { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--ink); color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track.heard .no { background: var(--muted); }
+  .track.now .no { background: var(--green); }
+  .track h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track p.look { margin: 6px 0 0; font-size: .93rem; }
+  .track details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .track summary { cursor: pointer; font-weight: 600; color: var(--green); }
+  .track details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .player .row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; align-items: center; }
+  .ctrls { display: flex; gap: 6px; align-items: center; }
+  .ctrls button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); }
+  .ctrls .pp { width: 52px; height: 52px; background: var(--green); color: #fff; }
+  .ctrls svg { width: 18px; height: 18px; } .ctrls .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--green); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .time label { display: inline-flex; gap: 6px; align-items: center; }
+  .time input { width: 16px; height: 16px; accent-color: var(--green); margin: 0; }
+</style>
+
+<style>
+  body { padding-bottom: calc(176px + env(safe-area-inset-bottom, 0px)); }
+  .keys { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .keys button.part { background: color-mix(in srgb, var(--green) 14%, var(--panel)); }
+  .chap { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 16px; scroll-margin-bottom: 190px; }
+  .chap.now { border-color: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 25%, transparent); }
+  .chap .head { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: start; }
+  .chap.done .no { background: var(--muted); }
+  .chap.now .no { background: var(--green); }
+  .chap h3 { margin: 0; font-size: 1.1rem; line-height: 1.25; }
+  .state { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .state b { color: var(--green); }
+  .prog { height: 6px; background: var(--chip); border-radius: 3px; overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--green); width: 0; }
+  .chap.done .prog i { background: var(--muted); }
+  ol.parts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .partbtn { width: 100%; text-align: left; border-radius: 10px; border: 0; background: var(--chip); padding: 9px 12px; display: grid; grid-template-columns: 3.2em minmax(0,1fr); gap: 8px; font-weight: 400; }
+  .partbtn .ts { font-variant-numeric: tabular-nums; color: var(--green); font-weight: 700; }
+  .partbtn .pt { font-weight: 600; display: block; }
+  .partbtn .pl { font-size: .86rem; color: var(--muted); display: block; margin-top: 2px; }
+  .partbtn.cur { background: color-mix(in srgb, var(--green) 16%, var(--panel)); }
+  .chap details { font-size: .9rem; color: var(--muted); }
+  .chap summary { cursor: pointer; font-weight: 600; color: var(--green); }
+  .chap details p { margin: 8px 0 0; }
+  .chap details p b { color: var(--ink); }
+  .small { font-size: .82rem; padding: 4px 12px; font-weight: 600; }
+
+  .player .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sub { font-size: .84rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seek { position: relative; height: 28px; display: flex; align-items: center; }
+  .seek input { width: 100%; margin: 0; accent-color: var(--green); height: 28px; position: relative; z-index: 1; background: transparent; }
+  .seek .mk { position: absolute; top: 4px; bottom: 4px; width: 2px; background: var(--gold); border-radius: 1px; z-index: 0; pointer-events: none; }
+  .ctrls5 { display: flex; gap: 8px; align-items: center; justify-content: center; }
+  .ctrls5 button { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); font-size: .78rem; font-weight: 700; }
+  .ctrls5 .pp { width: 56px; height: 56px; background: var(--green); color: #fff; }
+  .ctrls5 svg { width: 18px; height: 18px; } .ctrls5 .pp svg { width: 24px; height: 24px; }
+  .ctrls5 button:disabled { opacity: .4; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="florence.html">← Florence on Foot</a>
+    <div class="eyebrow" style="margin-top:10px">Audio guide · introduction + 15 stops · about 40 minutes</div>
+    <h1>Museo Galileo</h1>
+    <p class="lede">Start with the 10-minute introduction outside or in the entrance hall: Galileo's life, the Medici, and how the collection got here. Then play each stop when you enter its room. Every track begins by saying its stop and room number. The first floor is the Medici collections (rooms I–IX), the second floor the Lorraine collections (rooms X–XVIII). The player remembers where you stopped.</p>
+  </header>
+
+  <div class="offline" id="offline">
+    <p id="offTxt"><b>No signal later?</b> Save all tracks to this phone now (58 MB) so they play without internet.</p>
+    <button type="button" id="offBtn">⬇ Save for offline</button>
+  </div>
+
+  <section>
+    <div class="eyebrow" style="margin-bottom:8px">Tracks</div>
+    <div class="keys" id="keys" role="group" aria-label="Tracks"></div>
+  </section>
+
+  <div id="list" style="display:flex;flex-direction:column;gap:10px"></div>
+
+  <p class="fine">Narration made with ElevenLabs. Room numbers follow the museum's official plan (rooms I–XVIII); displays are sometimes rearranged. <button type="button" id="resetBtn" class="small">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="in">
+    <div style="min-width:0">
+      <div class="t" id="pTitle"></div>
+      <div class="sub" id="pSub">Press play</div>
+    </div>
+    <div class="seek" id="seekWrap"><input type="range" id="seek" min="0" max="100" step="1" value="0" aria-label="Position in track"></div>
+    <div class="time"><span id="pCur">0:00</span><label><input type="checkbox" id="auto"> Play next track automatically</label><span id="pDur"></span></div>
+    <div class="ctrls5">
+      <button type="button" id="prevBtn" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button type="button" id="backBtn" aria-label="Back 15 seconds">−15</button>
+      <button type="button" class="pp" id="ppBtn" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+      <button type="button" id="fwdBtn" aria-label="Forward 15 seconds">+15</button>
+      <button type="button" id="nextBtn" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    </div>
+  </div>
+</div>
+<audio id="audio" preload="none"></audio>
+
+<script>
+const CH = [{"slug": "intro", "key": "Intro", "label": "Introduction", "floor": "Before you go in", "where": "Outside, or in the entrance hall", "title": "Galileo, the Medici and this museum", "dur": 615.0, "parts": [{"slug": "i1", "title": "Before you go in", "look": "A science museum in the city of art, by the river behind the Uffizi.", "start": 0, "text": "Museo Galileo. Introduction. Welcome. Before you go in, let me tell you why this museum is here, and why it carries Galileo's name. You are standing behind the Uffizi, by the river, in front of an old palace, Palazzo Castellani. For centuries, a court of judges met here. That is why the little square is called Piazza dei Giudici. The Square of the Judges. Since nineteen thirty, the palace has kept something unexpected. Not paintings. Not statues. Instruments. Globes, astrolabes, compasses, thermometers, telescopes, electric machines. More than five thousand objects, about a thousand of them on display. Florence is famous as the city of art. But that is only half the story. The same city that paid for Botticelli also paid for astronomers, mapmakers, and engineers. Brunelleschi's dome, REMEMBER, was a problem of mathematics before it was a work of art. For two centuries, these very instruments stood in the Uffizi, in the same building as the Venus and the Primavera. For the Medici, a beautiful painting and a beautiful astrolabe were the same kind of treasure. Both showed that the prince understood the world. And at the centre of the whole collection is one man. The only instruments in the world that he built with his own hands are here. Two of his telescopes. The lens with which he discovered the moons of Jupiter. And, a little strangely, one of his fingers. So, before we meet the instruments, let's meet the man."}, {"slug": "i2", "title": "Galileo: the young professor", "look": "Pisa, a musician father, a swinging lamp, a tower, and eighteen happy years in Padua.", "start": 117.6, "text": "Galileo Galilei was born in Pisa, in fifteen sixty-four. The same year Michelangelo died, and Shakespeare was born. Florentines like to say the genius simply moved from one body to the next. His father, Vincenzo, was a musician. A lute player, and a quarrelsome theorist of music. He tested his ideas with real strings and real weights, instead of quoting ancient books. His son was watching. Galileo was sent to study medicine. He hated it. He discovered mathematics instead, almost by accident, the story goes, by listening at the door of a lesson. There are two famous stories about the young Galileo. In one, he watches a lamp swinging in the cathedral of Pisa, times it with his own pulse, and realises that each swing takes the same time, long or short. The pendulum. The lamp in the story, by the way, was hung there a few years too late. Never mind. In the other, he drops two balls of different weight from the Leaning Tower, to prove that they land together. He probably never did. But he certainly did the reasoning, and it was right. At twenty-five he was a professor in Pisa. Underpaid, argumentative, and famous for mocking colleagues who believed Aristotle without checking. So he moved to Padua, in the Republic of Venice, where he taught for eighteen years. He later called them the best years of his life. He had a Venetian companion, Marina, and three children. He took in students as lodgers, sold instruments, gave private lessons to young noblemen, and was ALWAYS short of money. Then, in the summer of sixteen-oh-nine, he heard a rumour. In Holland, someone had put two lenses in a tube, and far things looked near."}, {"slug": "i3", "title": "Galileo: the stars and the trial", "look": "The telescope, the Medicean Stars, a move to Florence, the Dialogue, the trial, Arcetri, and a tomb in Santa Croce.", "start": 239.1, "text": "Galileo did not invent the telescope. He made it into a scientific instrument. Within weeks, his tubes were better than the Dutch ones. And then he did something nobody had done in a systematic way. He pointed one at the sky. The Moon had mountains and valleys. The Milky Way was made of countless stars. And in January sixteen-ten, beside Jupiter, he saw four small points of light that moved, night after night. Moons. Going around another planet. So not everything turned around the Earth. He wrote it all in a short book, The Starry Messenger. And he named the moons the Medicean Stars, after the young Grand Duke Cosimo the Second, who had once been his pupil. It worked. Within months he was in Florence, as philosopher and mathematician to the Grand Duke. No more lessons. Just research. But the telescope also made him sure that Copernicus was right. The Earth moves, around the Sun. And that was dangerous. In sixteen thirty-two, he published a brilliant dialogue, in Italian, in which the defender of the old system is called Simplicio. The Pope was not amused. In sixteen thirty-three, in Rome, Galileo, almost seventy, was forced to kneel and abjure. He spent his last years under house arrest, in his villa at Arcetri, on the hill beyond San Miniato. He went blind. He kept working. He died in January sixteen forty-two. And that same year, in England, Isaac Newton was born. The Church would not allow a grand tomb. Only almost a century later, in seventeen thirty-seven, was his body moved to a monument in Santa Croce, opposite Michelangelo. And on that day, as you will hear upstairs, some admirers took a few souvenirs."}, {"slug": "i4", "title": "The Medici and science", "look": "From the map room in Palazzo Vecchio to the Uffizi; a pupil who became Grand Duke; the first scientific academy.", "start": 368.5, "text": "Now, the collectors. The Medici. In the fifteen-sixties, Cosimo the First, the first Grand Duke, created a room in Palazzo Vecchio covered with painted maps of the whole known world, with a huge globe in the middle. A theatre of the world, in one room. His scientific instruments were kept there. His sons moved them to the Uffizi, to a small room of mathematics, next to the paintings and the ancient statues. Francesco loved alchemy, and spent his nights among furnaces and flasks. Ferdinando collected instruments for navigation, for warfare, and for measuring the heavens. Then came the luckiest moment in the history of this collection. Cosimo the Second had been taught mathematics as a boy by a professor from Padua, during summer holidays. Galileo. When Cosimo became Grand Duke, he brought his old teacher home. And Galileo's instruments entered the Medici collection. Cosimo died young. His son, Ferdinando the Second, protected Galileo as much as he dared. It was not enough to stop the trial. But after Galileo's death, Ferdinando and his brother Leopoldo did something remarkable. In sixteen fifty-seven, they founded the Accademia del Cimento. The Academy of Experiment. The first society in Europe devoted entirely to science. A few years before the Royal Society in London. Its members were Galileo's pupils, and the pupils of his pupils. Their motto was provando e riprovando. Test, and test again. They made the most beautiful glass instruments of the age. You will see them on the first floor, in room eight. Galileo was condemned. But in Florence, his method won."}, {"slug": "i5", "title": "From the Medici to Museo Galileo", "look": "The Lorraine dukes, La Specola, the Tribune of Galileo, the 1966 flood, and how to use this guide.", "start": 487.3, "text": "When the last Medici died, in the seventeen-thirties, Tuscany passed to the House of Lorraine. Remember Anna Maria Luisa, the last of the family, who made sure the collections never left Florence? These instruments were part of that gift. The new Grand Duke, Peter Leopold, was a man of the Enlightenment. He reformed the state, and in seventeen eighty-six, Tuscany became the first state in the world to abolish the death penalty. He also loved science. He did chemistry experiments with his own hands. He took the instruments out of the Uffizi, and in seventeen seventy-five opened a new museum of physics and natural history, near Palazzo Pitti. Florentines call it La Specola, because of its observatory. It had workshops, laboratories, and the famous anatomical figures in wax. In eighteen forty-one, a marble hall was added there, the Tribune of Galileo, almost a chapel, for his instruments. After the unification of Italy, the collections went to the university. And in nineteen thirty, they came here, to Palazzo Castellani. In November nineteen sixty-six, the Arno flooded. This palace stands right on the river. The water and mud poured in, and the staff and volunteers worked for months to clean and save the instruments. In twenty-ten, after a complete renovation, the museum took its new name. Museo Galileo. Now, how to use this guide. The visit goes upwards. The first floor is the Medici, rooms one to nine. The second floor is the House of Lorraine, rooms ten to eighteen. Each stop in this guide begins with its room number. Play it when you enter that room. And take your time. These objects were made by people who wanted to understand the universe. They deserve to be looked at slowly."}]}, {"slug": "s01", "key": "1", "label": "Stop 1 · Room I", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room I · first floor", "title": "The Medici collections", "dur": 110.3, "parts": [{"slug": "s01", "title": "The Medici collections", "look": "Instruments that lived beside Botticelli; a family that collected the universe.", "start": 0, "text": "Stop one. Room one. The Medici collections. Here the story of the collection begins. Look at these objects for a moment, before reading any labels. Gilded brass, engraved silver, painted wood. They are scientific instruments. And they are also jewels. That was the point. For a Renaissance prince, owning the finest instruments in Europe meant something. It said, I can measure the heavens. I can map the earth. I can calculate the flight of a cannonball. I understand the world, and therefore, I deserve to rule it. Cosimo the First began the collection. His son Francesco added the strange things he loved: alchemy, natural curiosities. Ferdinando added instruments for the sea, for war, for the stars. Cosimo the Second added Galileo. And later Grand Dukes added the glass of the Accademia del Cimento. For about two hundred years, all this lived in the Uffizi, a few steps from here. If you visited the gallery, you walked through the same building. Visitors in those days saw paintings, statues, and instruments in one continuous show. Nobody thought science and art belonged in different museums. Many of these pieces were made in the Medici workshops, by craftsmen who were part engineer, part goldsmith. Precision, and beauty, in the same hands. As you go through the next rooms, keep that in mind. Everything here was made to work. And everything was made to be admired."}]}, {"slug": "s02", "key": "2", "label": "Stop 2 · Room II", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room II · first floor", "title": "Astronomy and time", "dur": 112.6, "parts": [{"slug": "s02", "title": "Astronomy and time", "look": "Astrolabes and sundials; why astrology mattered; Galileo's horoscope for a dying Grand Duke.", "start": 0, "text": "Stop two. Room two. Astronomy and time. Before clocks were reliable, time came from the sky. The Sun gave the day and the hour. The Moon gave the month. The stars gave the year. Many of the objects in this room are astrolabes. Flat discs of brass, with a lacy, pierced plate on top. An astrolabe is a model of the sky, squashed flat. Hold it up, sight the Sun or a star, turn the plates, and it tells you the time, by day or by night. It was the pocket computer of the Middle Ages. And astronomy had two jobs in those days. The first was the calendar. When is Easter? When should the fields be sown? The second was astrology. Today we smile. But for centuries, the most serious reason to know where the planets were was to predict the fortunes of kings. Doctors used it too, to choose the day to treat a patient. Even Galileo cast horoscopes. He needed the money. In early sixteen-oh-nine, the Grand Duke Ferdinando was gravely ill. His wife asked Galileo to read his stars. Galileo studied the sky and announced a long and happy life. Three weeks later, the Grand Duke was dead. We do not know exactly what Galileo thought of astrology. But after that, he was perhaps a little more modest about predicting the future. Look at the craftsmanship in this room. The finest of these instruments could tell the hour within a few minutes, with nothing but a ray of sunlight."}]}, {"slug": "s03", "key": "3", "label": "Stop 3 · Room III", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room III · first floor", "title": "The representation of the world", "dur": 112.2, "parts": [{"slug": "s03", "title": "The representation of the world", "look": "Santucci's great armillary sphere: the whole universe, with the Earth at the centre, finished just before Galileo proved it wrong.", "start": 0, "text": "Stop three. Room three. The representation of the world. In the middle of this room stands the most spectacular object in the museum. A gilded sphere, nearly four metres high, made of rings inside rings. The armillary sphere of Antonio Santucci. It was built for the Grand Duke Ferdinando, between fifteen eighty-eight and fifteen ninety-three. It is a model of the whole universe, as people understood it then. And at the very centre, small, and perfectly still, the Earth. Around it, nested shells. The Moon. Mercury, Venus, the Sun, Mars, Jupiter, Saturn. Then the sphere of the fixed stars, with the signs of the zodiac. And beyond it all, the realm of God. This is the universe of Ptolemy, a Greek astronomer who lived in Egypt in the second century. It had lasted for almost fifteen hundred years. And it worked surprisingly well. You could predict eclipses with it. Now here is the irony. This magnificent machine was finished about seventeen years before Galileo pointed his telescope at Jupiter, saw moons going around it, and began to take this whole beautiful structure apart. Around the room, maps and globes show the other great passion of the Medici. The Earth itself. Ptolemy's Geography had been rediscovered in Florence, and the Medici wanted to own the world, at least on paper. So take a last look at the golden sphere. It is wrong. And it is wonderful."}]}, {"slug": "s04", "key": "4", "label": "Stop 4 · Room IV", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room IV · first floor", "title": "Vincenzo Coronelli's globes", "dur": 105.2, "parts": [{"slug": "s04", "title": "Vincenzo Coronelli's globes", "look": "A Venetian friar who made globes as big as rooms for Louis XIV, and how a globe is built from paper.", "start": 0, "text": "Stop four. Room four. Vincenzo Coronelli's globes. Vincenzo Coronelli was a Franciscan friar from Venice. And he was the most famous globe maker of his age. His speciality was size. For Louis the Fourteenth, he made two globes nearly four metres across. One of the Earth, one of the heavens. The ones here are smaller. About one metre, and about half a metre. Small, for Coronelli. In sixteen eighty-four, he founded in Venice what is often called the first geographical society in the world. The Academy of the Argonauts. Its members paid a subscription, and received his maps and globes. A kind of club for armchair explorers. How do you make a globe? On the walls of this room, you can see the answer. Long paper strips, pointed at both ends, like the peel of an orange laid flat. They are called gores. The map is printed on them, then they are glued, one by one, onto a ball of wood and papier-mâché, covered with plaster. The two round pieces are the polar caps. These sheets were printed in the twentieth century from Coronelli's original copper plates, which are still kept in Paris. And look closely at the globes themselves. The world of the sixteen-nineties. Coasts that stop where the explorers stopped. Vast spaces with nothing but a sea monster, or a guess. Like the old maps in Palazzo Vecchio, they show not only what people knew, but exactly where their knowledge ran out."}]}, {"slug": "s05", "key": "5", "label": "Stop 5 · Room V", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room V · first floor", "title": "The science of navigation", "dur": 117.2, "parts": [{"slug": "s05", "title": "The science of navigation", "look": "Sir Robert Dudley: an English adventurer who ran away with his cousin, built the Medici navy, and wrote the first sea atlas in Mercator projection.", "start": 0, "text": "Stop five. Room five. The science of navigation. Tuscany was a small state. But the Medici dreamed of the ocean. Of trade with the Indies, east and west. They turned the little fishing town of Livorno into one of the great ports of the Mediterranean. And to do it, they hired a remarkable Englishman. Sir Robert Dudley. He was the son of the Earl of Leicester, Queen Elizabeth's favourite. But he was born outside marriage, and English courts refused to recognise him as his father's heir. So in sixteen-oh-five, he left England. With him travelled his young cousin, Elizabeth Southwell, disguised as a page boy. He had a wife and children at home. He married Elizabeth anyway, abroad. In Florence, Ferdinando the First took him into his service. Dudley designed warships, worked on the port of Livorno, and drained marshes. The Emperor even gave him a title. Duke of Northumberland. In his old age, he published in Florence a huge work on the art of navigation. The Secret of the Sea. It contains the first sea atlas drawn entirely in Mercator's projection, the system that lets a sailor follow a straight line on the map. When he died, his nautical instruments joined the Medici collection. Some of them are in this room. Instruments for finding latitude from the Sun and stars, compasses, charts. And yet, one problem had no solution. Longitude. How far east or west are you, in the middle of the ocean? Keep that question in mind. Galileo thought he had the answer. You will hear it in room seven."}]}, {"slug": "s06", "key": "6", "label": "Stop 6 · Room VI", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room VI · first floor", "title": "The science of warfare", "dur": 117.1, "parts": [{"slug": "s06", "title": "The science of warfare", "look": "Cannons turned war into geometry; Galileo taught mathematics to young officers and sold his own calculating instrument.", "start": 0, "text": "Stop six. Room six. The science of warfare. In fifteen ninety-nine, Ferdinando the First moved his mathematical instruments into a room of the Uffizi devoted to military architecture. It sounds strange today. It was not strange then. Gunpowder had changed everything. Cannons could smash medieval walls. So fortresses had to be redesigned, low and thick, with angled bastions, calculated with geometry. Like the bastions Michelangelo built at San Miniato. And firing a cannon well was a mathematical problem. How high to raise the barrel? How much powder for this weight of ball? Look at the instruments here. Gunners' quadrants, sights, tools for measuring distance and angle across a battlefield. A gentleman, in those years, was expected to know some mathematics. And who taught them? In Padua, Galileo. He gave private lessons to young noblemen on fortification, surveying, and military engineering. It paid much better than his university salary. He even invented an instrument for them. A geometric and military compass. Two hinged rulers, covered with scales, that could calculate almost anything a soldier needed, without writing a single sum. He had a craftsman living in his house to make them, and he sold them, with a printed manual, and lessons. When a student published the invention as his own, Galileo took him to court, and won. His own compass is in the next room. And one more thing. Many years later, Galileo proved that a cannonball, without air resistance, flies along a perfect curve. A parabola. Mathematics, born on the battlefield, became physics."}]}, {"slug": "s07", "key": "7", "label": "Stop 7 · Room VII", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room VII · first floor", "title": "Galileo's telescopes", "dur": 121.1, "parts": [{"slug": "s07", "title": "Galileo's telescopes", "look": "The two surviving telescopes and the cracked lens that found Jupiter's moons.", "start": 0, "text": "Stop seven. Room seven. Galileo's new world. The telescopes. This is the heart of the museum. Look for two long, thin tubes, a metre or more in length, made of wood and paper. They look modest. They are the only two telescopes made by Galileo himself that still exist. He made dozens. He ground the lenses himself, and most of them were not good enough. The best of his telescopes magnified about twenty times. A cheap pair of binoculars today is better. And yet. In the summer of sixteen-oh-nine, he climbed the bell tower of Saint Mark's in Venice with the senators of the Republic, and showed them ships at sea, hours before anyone could see them from the port. His salary was doubled on the spot. Then he turned the tube upwards. Now look for a small, round lens, cracked, set in an elaborate frame of ebony and ivory. This is the objective lens of the telescope with which Galileo discovered the moons of Jupiter, in January sixteen-ten. It broke, but it was kept like a relic, and later framed with an inscription. Through this piece of glass, for the first time, a human being saw that not everything in the sky turns around the Earth. With the same kind of tube, Galileo saw the phases of Venus, like a little moon. Dark spots on the Sun. And Saturn, which looked to him as if it had ears. His telescope was too weak to show the rings. Stand here for a moment. These are not copies. These are the eyes through which modern astronomy began."}]}, {"slug": "s08", "key": "8", "label": "Stop 8 · Room VII", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room VII · first floor", "title": "Galileo's fingers, and the moons as a clock", "dur": 120.5, "parts": [{"slug": "s08", "title": "Galileo's fingers, and the moons as a clock", "look": "The jovilabe and the longitude problem; the finger taken from his body in 1737, and the relics that came back in 2009.", "start": 0, "text": "Stop eight. Still in room seven. Galileo's fingers, and the moons as a clock. Remember the problem from the navigation room? Longitude. Galileo had an idea. Jupiter's moons go around the planet like the hands of a clock, the same for everyone on Earth. If a sailor could see them, and had good tables, he could compare local time with the time in Florence, and know how far east or west he was. Look for a small brass instrument with dials, the jovilabe, made to work out the positions of the moons. Galileo offered his method to Spain, and to Holland. On a rolling ship, it was almost impossible to use. On land, it later helped to make far better maps. And now, the strangest object in the museum. In a glass case, on a small marble column, a finger. Galileo's middle finger, from his right hand. In seventeen thirty-seven, almost a century after his death, his body was moved to the new tomb in Santa Croce. During the ceremony, some admirers removed a few souvenirs. This finger, and also a thumb, an index finger, and a tooth. The middle finger came here, with a Latin poem on its base. The other relics passed through private hands, disappeared for about a century, and reappeared at an auction in two thousand and nine. They are here too. It looks like the relic of a saint. And in a way, that is what it is. The relic of a saint of science, kept with the devotion that the Church once refused him. And people have noticed which finger it is, and that it points upwards. Towards the sky. Or, some like to say, towards his judges."}]}, {"slug": "s09", "key": "9", "label": "Stop 9 · Room VIII", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room VIII · first floor", "title": "The Accademia del Cimento", "dur": 121.8, "parts": [{"slug": "s09", "title": "The Accademia del Cimento", "look": "Test and test again: the first scientific academy, its fragile glass thermometers, and the end of 'nature abhors a vacuum'.", "start": 0, "text": "Stop nine. Room eight. The Accademia del Cimento. Galileo died in sixteen forty-two. Fifteen years later, his pupils were still in Florence, and the Medici gave them a home. The Academy of Experiment. Ten years of work, from sixteen fifty-seven to sixteen sixty-seven, in the rooms of Palazzo Pitti. Their motto, remember, was provando e riprovando. Test, and test again. No authority. Not even Aristotle. Only experiment. Look at the glass. Thin, delicate, blown by Florentine glassmakers into spirals, columns, tiny bulbs. Many of these are thermometers. The Academy was among the first to use sealed thermometers with scales, so that a measurement in Florence could be compared with one somewhere else. Small glass beads on the tube mark the degrees. One of their designs, a tube of liquid with little glass balls floating inside, each sinking or rising with the temperature, is sold today in gift shops all over the world as the Galileo thermometer. ACTUALLY, it was invented by his followers. They also studied the vacuum. For two thousand years, philosophers had said nature abhors a vacuum. Galileo's last assistant, Evangelista Torricelli, had already filled a glass tube with mercury, turned it upside down, and seen an empty space appear at the top. The first barometer. The Academy went further, and put candles, bells, and sadly animals, into the empty space, to see what happened. In sixteen sixty-seven, they published their experiments, and the Academy ended. But scientific societies all over Europe would follow its example."}]}, {"slug": "s10", "key": "10", "label": "Stop 10 · Room IX", "floor": "First floor · The Medici collections (rooms I–IX)", "where": "Room IX · first floor", "title": "After Galileo", "dur": 120.2, "parts": [{"slug": "s10", "title": "After Galileo", "look": "Bigger telescopes, the first microscopes, and Francesco Redi's jars of meat that disproved spontaneous generation.", "start": 0, "text": "Stop ten. Room nine. After Galileo. In the decades after Galileo, lenses got better, and the world got bigger. In both directions. Telescopes grew longer and longer. Look at the tubes in this room. Better lenses, more powerful, made by instrument makers in Rome and elsewhere. With telescopes like these, astronomers finally saw that Saturn's strange ears were a ring. And the same lenses, turned around, became microscopes. Suddenly, a drop of water, the eye of a fly, the surface of a leaf, were whole new worlds. Let me tell you about one man. Francesco Redi. Physician to the Grand Dukes, naturalist, and a poet. He wrote a long, cheerful poem in praise of Tuscan wines. In his time, almost everyone believed in spontaneous generation. Leave meat out, and worms appear from it. Obviously. Redi tested it. In the sixteen-sixties, he put pieces of meat in jars. Some open. Some sealed. Some covered with fine gauze, so that air could enter, but flies could not. Worms appeared only where flies could lay their eggs. Life, he concluded, comes from life. Simple. Elegant. And exactly in the spirit of Galileo. Don't argue. Test. Look also at the instruments for measuring the weather: thermometers, barometers, devices for measuring humidity. The Medici even organised one of the first networks of weather stations, with observers in several cities recording the weather at the same hours. This is the end of the first floor, and the end of the Medici. Take the stairs up, to the House of Lorraine."}]}, {"slug": "s11", "key": "11", "label": "Stop 11 · Room X", "floor": "Second floor · The Lorraine collections (rooms X–XVIII)", "where": "Room X · second floor", "title": "The Lorraine collections", "dur": 121.5, "parts": [{"slug": "s11", "title": "The Lorraine collections", "look": "A new dynasty, an enlightened Grand Duke, a museum open to the public, and the waxes of La Specola.", "start": 0, "text": "Stop eleven. Room ten. The Lorraine collections. Welcome to the second floor, and to a new century. The eighteenth. The age of the Enlightenment. The Medici are gone. The new rulers of Tuscany come from Lorraine, and are related to the Habsburg emperors in Vienna. The most important of them is Peter Leopold. Grand Duke from seventeen sixty-five, later Emperor. A serious, restless reformer. He abolished torture, and then the death penalty. He reorganised hospitals and schools. And he believed science should be useful, and public. So he did something new. He took the instruments out of the Uffizi, added new ones, and opened a museum of physics and natural history, in the Oltrarno, near Palazzo Pitti. Not a private treasure for a prince. A place where scientists worked, and where visitors could come and learn. Its first director, Felice Fontana, filled it with workshops. Instruments were built there, repaired there, invented there. And Fontana commissioned something extraordinary: anatomical models in coloured wax. Bodies opened like books, every muscle, every vein. You can still see hundreds of them at La Specola, on Via Romana. On this floor, you will also meet the obstetric models, used to teach doctors and midwives how a child is born, and what can go wrong. They are beautifully made, and very direct. Be prepared. The objects up here are different from downstairs. Less gold. More wood and glass and brass. The jewels of the princes have become the tools of the scientists."}]}, {"slug": "s12", "key": "12", "label": "Stop 12 · Room XI", "floor": "Second floor · The Lorraine collections (rooms X–XVIII)", "where": "Room XI · second floor", "title": "The spectacle of science", "dur": 122.4, "parts": [{"slug": "s12", "title": "The spectacle of science", "look": "Electric soirées: sparks, shocks, a kiss that stings, and 180 royal guards jumping at once.", "start": 0, "text": "Stop twelve. Room eleven. The spectacle of science. Imagine a Paris salon, around seventeen fifty. Candles, silk dresses, powdered wigs. And in the middle of the room, a machine. A glass globe or disc, turned by a handle, rubbing against a cushion. An electrostatic machine. You will see several in this room. In the eighteenth century, electricity was not useful. It was entertainment. Travelling lecturers performed experiments the way magicians perform tricks. Hair standing on end. Sparks jumping from a finger. Alcohol set on fire by an electric spark. One favourite trick was the electric kiss. A young lady stood on an insulating stool and was charged with electricity. Gentlemen were invited to kiss her. As their lips approached, a sharp spark jumped between them. Few came back for a second try. The most famous demonstrator was a French priest, the Abbé Nollet. In seventeen forty-six, in front of King Louis the Fifteenth, he discharged a jar full of electricity through a hundred and eighty royal guards, all holding hands. They all jumped into the air at the same moment. The king was delighted. Later, he did the same with a long line of monks, stretching more than a kilometre, to see how fast electricity travelled. Instantly, it seemed. It sounds like a game. But these games were real research. The jar that stored the charge was the ancestor of every battery and every capacitor in your phone. Look at the elegance of these machines. Mahogany, brass, glass. They were made for a stage, as much as for a laboratory."}]}, {"slug": "s13", "key": "13", "label": "Stop 13 · Room XVI", "floor": "Second floor · The Lorraine collections (rooms X–XVIII)", "where": "Room XVI · second floor", "title": "Electricity: from frogs to the battery", "dur": 127.9, "parts": [{"slug": "s13", "title": "Electricity: from frogs to the battery", "look": "Galvani's twitching frog legs, Volta's answer, and the pile of discs that started the electric age.", "start": 0, "text": "Stop thirteen. Room sixteen. Electricity and electromagnetism. Rooms twelve to fifteen show the teaching machines and the precision instruments of the period. Wander through them at your own pace. This stop is for room sixteen. In the seventeen-eighties, in Bologna, a doctor called Luigi Galvani was dissecting frogs. He noticed that a dead frog's legs twitched, when touched with two different metals. He concluded that the electricity came from the animal. Animal electricity. The force of life itself. In Pavia, a physicist called Alessandro Volta was not convinced. The electricity, he said, comes from the two metals. The frog is only the detector. To prove it, around seventeen ninety-nine, he built a column of discs. Zinc, copper, and cardboard soaked in salt water, again and again. A pile. And from it flowed something new. Not a single spark, but a steady, continuous current. The first electric battery. In eighteen hundred, he announced it to the Royal Society in London. Napoleon made him a count. And every time you say volt, you say his name. Both men were partly right. Our nerves really do work with electricity. But Volta's pile changed the world. With a steady current, scientists could split water into gases, discover new elements, and find that electricity and magnetism are two faces of the same force. Look at the instruments here: coils, magnets, needles that move when a current passes. From them would come the telegraph, the electric motor, and the generator. A new industrial revolution, which started with a frog."}]}, {"slug": "s14", "key": "14", "label": "Stop 14 · Room XVII", "floor": "Second floor · The Lorraine collections (rooms X–XVIII)", "where": "Room XVII · second floor", "title": "Chemistry and the burning lens", "dur": 128.9, "parts": [{"slug": "s14", "title": "Chemistry and the burning lens", "look": "Medici alchemy, the great lens that burned a diamond, and the Grand Duke's own chemistry cabinet.", "start": 0, "text": "Stop fourteen. Room seventeen. Chemistry, and the public usefulness of science. Chemistry in Florence began as alchemy. The Medici court attracted alchemists for two centuries. Francesco the First spent nights among his furnaces, looking for the secret of gold. Very little of that equipment survives. But one object here is unforgettable. A great lens, given to Grand Duke Cosimo the Third in the sixteen-nineties, to test what fire does to precious stones. In those years, scientists in Florence focused sunlight with a burning lens onto a diamond. They expected it to melt, perhaps. It didn't. It slowly disappeared. A diamond, the hardest thing on Earth, could burn away, almost to nothing. A century later, chemists understood why. A diamond is made of carbon, like coal. One of the most expensive experiments in history, paid for by a Grand Duke. Now, the House of Lorraine. Peter Leopold loved chemistry, and did experiments himself. His personal chemistry cabinet is in this museum: a piece of furniture full of drawers, bottles, and small instruments, a laboratory that a Grand Duke could open in his study. Look also for the large table of chemical affinities, which hung in the Grand Duke's pharmacy. A chart of which substances combine with which. An early ancestor of the periodic table. And instruments by Volta again. An electric pistol, in which a spark ignites a gas with a bang, and a lamp that burns hydrogen. For the Lorraine Grand Dukes, chemistry was not magic, and not just curiosity. It meant better medicines, cleaner air, and healthier people. Science for the public good."}]}, {"slug": "s15", "key": "15", "label": "Stop 15 · Room XVIII", "floor": "Second floor · The Lorraine collections (rooms X–XVIII)", "where": "Room XVIII · second floor", "title": "Science in the home", "dur": 123.6, "parts": [{"slug": "s15", "title": "Science in the home", "look": "Telescopes hidden in walking sticks and cosmetic boxes; and Galileo's book of the universe. Goodbye.", "start": 0, "text": "Stop fifteen. Room eighteen. Science in the home. The last room. And perhaps the most charming. By the eighteenth century, science was fashionable. Rich families wanted it at home. Not in a laboratory, but in the drawing room. Instrument makers sold ready-made kits, in fitted boxes. A microscope for the evenings. A small telescope. An electric machine to amaze the guests. And some instruments became furniture. Beautiful table clocks. Elegant globes. Barometers and thermometers decorated like little altars. And then, the extravagant ones. Telescopes for ladies, combined with ivory boxes for cosmetics. Telescopes for gentlemen, hidden inside walking sticks. Perfect for the theatre, or for observing the neighbours. It is a long way from Galileo's two rough tubes downstairs. In two centuries, an instrument that shook the universe had become an accessory. And that, ACTUALLY, is a kind of victory. Let me leave you with Galileo's own words. He wrote that philosophy is written in a great book, which stands always open before our eyes. The universe. But it cannot be understood unless you first learn its language. And it is written in the language of mathematics. Everything in this museum is an attempt to read that book. When you leave, walk a few steps to the river. And some clear night, look for Jupiter. When it is up, it is one of the brightest points in the sky. With ordinary binoculars, you can see its four moons, tiny dots in a line, still turning. Just as he saw them. Thank you for visiting the Museo Galileo with me."}]}];
+const OLD = [];   // the earlier 16-episode version, to carry over progress
+const CACHE = "galileo-guide-v1";
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+const url = c => `audio/galileo/${c.slug}.mp3`;
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+
+/* progress: position per chapter (seconds) and finished chapters */
+let pos = store.get("galileo-pos", null), done = new Set(store.get("galileo-done", [])), current = store.get("galileo-current", null);
+if (pos === null) {             // first visit of the new version: carry over the old episode ticks
+  pos = {};
+  const heardOld = new Set(store.get("galileo-none", []));
+  CH.forEach(c => {
+    const flags = c.parts.map(p => heardOld.has(OLD.indexOf(p.slug)));
+    if (flags.length && flags.every(Boolean)) done.add(c.slug);
+    else if (flags.some(Boolean)) pos[c.slug] = c.parts[flags.indexOf(false)].start;
+  });
+  const oc = OLD[store.get("galileo-none2", -1)];
+  if (oc) { const ci = CH.findIndex(c => c.parts.some(p => p.slug === oc)); if (ci >= 0) { current = ci; if (!done.has(CH[ci].slug) && !pos[CH[ci].slug]) pos[CH[ci].slug] = CH[ci].parts.find(p => p.slug === oc).start; } }
+  save();
+}
+if (current === null || !CH[current]) current = 0;
+function save() { store.set("galileo-pos", pos); store.set("galileo-done", [...done]); store.set("galileo-current", current); }
+
+let loaded = -1, blobUrl = null, wakeLock = null, dragging = false, lastSave = 0;
+$("auto").checked = store.get("galileo-auto", true);
+$("auto").onchange = () => store.set("galileo-auto", $("auto").checked);
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+const partAt = (c, t) => { let k = 0; c.parts.forEach((p, i) => { if (t >= p.start - 0.5) k = i; }); return k; };
+const timeNow = i => (i === loaded && audio.src) ? audio.currentTime : (done.has(CH[i].slug) ? 0 : (pos[CH[i].slug] || 0));
+
+function stateText(c, i) {
+  const t = timeNow(i);
+  const pt = c.parts.length > 1 ? ` · part ${partAt(c, t) + 1} of ${c.parts.length}` : "";
+  if (i === loaded && !audio.paused) return `<b>Playing</b> · ${fmt(t)} of ${fmt(c.dur)}${pt}`;
+  if (done.has(c.slug)) return "✓ Finished";
+  if (t > 1) return `Stopped at ${fmt(t)} of ${fmt(c.dur)}${pt}`;
+  return `${fmt(c.dur)} · not started`;
+}
+function fraction(c, i) { if (done.has(c.slug) && !(i === loaded && !audio.paused)) return 1; return Math.min(1, timeNow(i) / c.dur); }
+
+function render() {
+  const playing = !audio.paused && !!audio.src;
+  $("keys").innerHTML = CH.map((c, i) => `<button type="button" data-i="${i}" class="${i === current && audio.src ? "now" : done.has(c.slug) ? "heard" : pos[c.slug] > 1 ? "part" : ""}" aria-label="${esc(c.label)}: ${esc(c.title)}">${esc(c.key)}</button>`).join("");
+  let lastFloor = null;
+  $("list").innerHTML = CH.map((c, i) => {
+    const hd = c.floor !== lastFloor ? `<h2>${esc(c.floor)}</h2>` : ""; lastFloor = c.floor;
+    const now = i === current && audio.src, t = timeNow(i), k = partAt(c, t);
+    const resume = !done.has(c.slug) && t > 1 && !(now && playing);
+    return hd + `<article class="chap ${now ? "now" : ""} ${done.has(c.slug) ? "done" : ""}" id="c-${i}">
+      <div class="head">
+        <span class="no" style="font-size:${c.key.length > 2 ? ".7rem" : "1rem"}">${esc(c.key)}</span>
+        <div style="min-width:0"><div class="state" style="font-weight:700;color:var(--gold)">${esc(c.label)}</div><h3>${esc(c.title)}</h3><div class="state" id="st-${i}">${stateText(c, i)}</div></div>
+        <button class="play" type="button" data-i="${i}" aria-label="${now && playing ? "Pause" : resume ? "Resume" : "Play"} ${esc(c.label)}">${now && playing ? pauseSvg : playSvg}</button>
+      </div>
+      <div class="prog"><i id="pg-${i}" style="width:${fraction(c, i) * 100}%"></i></div>
+      ${c.parts.length === 1 ? `<p style="margin:0;font-size:.93rem">${esc(c.parts[0].look)}</p>` : `<ol class="parts">${c.parts.map((p, j) => `<li><button type="button" class="partbtn ${(now || resume) && j === k ? "cur" : ""}" data-i="${i}" data-t="${p.start}"><span class="ts">${fmt(p.start)}</span><span><span class="pt">${c.parts.length > 1 ? `Part ${j + 1} · ` : ""}${esc(p.title)}</span><span class="pl">${esc(p.look)}</span></span></button></li>`).join("")}</ol>`}
+      <details><summary>Read along</summary>${c.parts.map(p => `<p>${c.parts.length > 1 ? `<b>${fmt(p.start)} · ${esc(p.title)}</b><br>` : ""}${esc(p.text)}</p>`).join("")}</details>
+      ${done.has(c.slug) || t > 1 ? `<div><button type="button" class="small" data-restart="${i}">↺ Start from the beginning</button></div>` : ""}
+    </article>`;
+  }).join("");
+  document.querySelectorAll("#keys button, .chap .play").forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (i === current && audio.src && !audio.paused) audio.pause(); else play(i, null, b.closest("#keys") !== null);
+  });
+  document.querySelectorAll(".partbtn").forEach(b => b.onclick = () => play(+b.dataset.i, +b.dataset.t));
+  document.querySelectorAll("[data-restart]").forEach(b => b.onclick = () => { const i = +b.dataset.restart; done.delete(CH[i].slug); pos[CH[i].slug] = 0; save(); play(i, 0); });
+  renderPlayer();
+}
+function renderPlayer() {
+  const c = CH[current], playing = !audio.paused && !!audio.src, t = timeNow(current), k = partAt(c, t);
+  $("pTitle").textContent = `${c.label} · ${c.title}`;
+  $("pSub").textContent = c.parts.length > 1 ? `${audio.src || t > 1 ? `Part ${k + 1} of ${c.parts.length} · ${c.parts[k].title}` : c.where}` : c.where;
+  $("ppIcon").innerHTML = playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l13-7.5z"/>';
+  $("ppBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
+  $("prevBtn").disabled = current === 0 && t < 5; $("nextBtn").disabled = current === CH.length - 1;
+  $("seek").max = Math.round(c.dur);
+  if (!dragging) $("seek").value = Math.round(t);
+  $("pCur").textContent = fmt(t); $("pDur").textContent = fmt(c.dur);
+  $("seekWrap").querySelectorAll(".mk").forEach(m => m.remove());
+  c.parts.slice(1).forEach(p => { const m = document.createElement("span"); m.className = "mk"; m.style.left = `calc(${p.start / c.dur * 100}% )`; $("seekWrap").appendChild(m); });
+}
+function tick() {          // light update while playing (no full re-render)
+  const i = loaded; if (i < 0) return;
+  const c = CH[i];
+  const st = $("st-" + i); if (st) st.innerHTML = stateText(c, i);
+  const pg = $("pg-" + i); if (pg) pg.style.width = `${fraction(c, i) * 100}%`;
+  const k = partAt(c, audio.currentTime);
+  document.querySelectorAll(`#c-${i} .partbtn`).forEach((b, j) => b.classList.toggle("cur", j === k));
+  renderPlayer();
+}
+
+async function sourceFor(c) {
+  try {
+    if ("caches" in window) {
+      const hit = await (await caches.open(CACHE)).match(url(c));
+      if (hit) { if (blobUrl) URL.revokeObjectURL(blobUrl); blobUrl = URL.createObjectURL(await hit.blob()); return blobUrl; }
+    }
+  } catch (e) {}
+  return url(c);
+}
+function seekTo(t) {
+  const set = () => { try { audio.currentTime = t; } catch (e) {} };
+  if (audio.readyState >= 1) set(); else audio.addEventListener("loadedmetadata", set, { once: true });
+}
+async function play(i, t, scroll) {
+  const c = CH[i];
+  if (t === null || t === undefined) t = done.has(c.slug) ? 0 : (pos[c.slug] || 0);
+  if (t >= c.dur - 1) t = 0;
+  if (loaded !== i) { current = i; audio.src = await sourceFor(c); loaded = i; }
+  current = i; save();
+  seekTo(t);
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: `${c.label} · ${c.title}`, artist: "Florence on Foot", album: "Museo Galileo" });
+  audio.play().catch(() => {});
+  keepAwake();
+  render();
+  if (scroll) $("c-" + i).scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function jump(d) {
+  if (!audio.src) { play(current, Math.max(0, (pos[CH[current].slug] || 0) + d)); return; }
+  audio.currentTime = Math.max(0, Math.min(audio.duration || CH[current].dur, audio.currentTime + d));
+}
+$("ppBtn").onclick = () => { if (!audio.src) play(current, null, true); else if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+$("backBtn").onclick = () => jump(-15);
+$("fwdBtn").onclick = () => jump(15);
+$("prevBtn").onclick = () => { if (audio.src && audio.currentTime > 5) audio.currentTime = 0; else if (current > 0) play(current - 1, 0, true); };
+$("nextBtn").onclick = () => { if (current < CH.length - 1) play(current + 1, 0, true); };
+$("seek").addEventListener("input", () => { dragging = true; $("pCur").textContent = fmt(+$("seek").value); const c = CH[current], k = partAt(c, +$("seek").value); if (c.parts.length > 1) $("pSub").textContent = `Part ${k + 1} of ${c.parts.length} · ${c.parts[k].title}`; });
+$("seek").addEventListener("change", () => { dragging = false; const v = +$("seek").value; if (audio.src && loaded === current) audio.currentTime = v; else play(current, v); });
+if ("mediaSession" in navigator) {
+  const h = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch (e) {} };
+  h("play", () => audio.play()); h("pause", () => audio.pause());
+  h("previoustrack", () => $("prevBtn").onclick()); h("nexttrack", () => $("nextBtn").onclick());
+  h("seekbackward", d => jump(-(d.seekOffset || 15))); h("seekforward", d => jump(d.seekOffset || 15));
+  h("seekto", d => { audio.currentTime = d.seekTime; });
+}
+audio.addEventListener("play", render);
+audio.addEventListener("pause", () => { if (loaded >= 0) { pos[CH[loaded].slug] = audio.currentTime; save(); } render(); });
+audio.addEventListener("timeupdate", () => {
+  if (loaded < 0) return;
+  const c = CH[loaded];
+  if (audio.currentTime > 1) pos[c.slug] = audio.currentTime;
+  if (Date.now() - lastSave > 4000) { lastSave = Date.now(); save(); }
+  if ("mediaSession" in navigator && audio.duration) { try { navigator.mediaSession.setPositionState({ duration: audio.duration, position: audio.currentTime, playbackRate: 1 }); } catch (e) {} }
+  tick();
+});
+audio.addEventListener("ended", () => {
+  const c = CH[loaded]; done.add(c.slug); pos[c.slug] = 0; save();
+  if ($("auto").checked && loaded < CH.length - 1) play(loaded + 1, 0, true); else render();
+});
+async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); } } catch (e) {} }
+window.addEventListener("pagehide", save);
+document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
+$("resetBtn").onclick = () => { done = new Set(); pos = {}; save(); render(); };
+
+/* ---------- offline ---------- */
+async function checkOffline() {
+  try {
+    if (!("caches" in window)) { $("offline").hidden = true; return; }
+    const c = await caches.open(CACHE); const keys = await c.keys();
+    if (keys.length >= CH.length) { $("offline").classList.add("done"); $("offTxt").innerHTML = "<b>✓ Saved on this phone.</b> All tracks play without internet."; $("offBtn").hidden = true; }
+  } catch (e) { $("offline").hidden = true; }
+}
+$("offBtn").onclick = async () => {
+  $("offBtn").disabled = true;
+  try {
+    const cache = await caches.open(CACHE); let n = 0;
+    for (const c of CH) {
+      if (!(await cache.match(url(c)))) { const r = await fetch(url(c)); if (!r.ok) throw new Error(r.status); await cache.put(url(c), r); }
+      n++; $("offBtn").textContent = `Saving… ${n}/${CH.length}`;
+    }
+    checkOffline();
+  } catch (e) {
+    $("offBtn").disabled = false; $("offBtn").textContent = "⬇ Try again";
+    $("offTxt").innerHTML = "<b>Saving stopped.</b> The connection dropped. Tap Try again; tracks already saved are kept.";
+  }
+};
+checkOffline();
+render();
+</script>
+</body>
+</html>

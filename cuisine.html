@@ -315,6 +315,8 @@ audio.addEventListener("ended", () => {
   if ($("auto").checked && loaded < CH.length - 1) play(loaded + 1, 0, true); else render();
 });
 async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); } } catch (e) {} }
+window.addEventListener("pagehide", save);
+document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
 $("resetBtn").onclick = () => { done = new Set(); pos = {}; save(); render(); };
 
 /* ---------- offline ---------- */
