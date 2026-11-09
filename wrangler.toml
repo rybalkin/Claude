@@ -1,0 +1,16 @@
+# Cloudflare Pages configuration.
+# Cloudflare reads this file when the project is connected to this repo
+# (Workers & Pages → Create → Pages → Connect to Git).
+name = "zurich-firenze"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-10-01"
+
+# --- Optional: database (Cloudflare D1, serverless SQLite) -------------------
+# 1. npx wrangler d1 create zurich-firenze-db
+# 2. Paste the printed database_id below and uncomment.
+# 3. Query it from Pages Functions in functions/ via `context.env.DB`.
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "zurich-firenze-db"
+# database_id = "<paste-id-here>"
