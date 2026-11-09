@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="description" content="A small test web app that installs on Android.">
+  <title>Test App</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <style>
+    :root {
+      --bg: #f4f6fb; --card: #ffffff; --text: #111827; --muted: #6b7280;
+      --accent: #2563eb; --accent-text: #ffffff; --border: #e5e7eb;
+      --ok: #16a34a; --bad: #dc2626;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b1020; --card: #151b2e; --text: #e5e7eb; --muted: #9ca3af;
+        --accent: #3b82f6; --border: #262f47;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+      -webkit-tap-highlight-color: transparent;
+    }
+    header { display: flex; align-items: center; gap: 12px; padding: 20px 0 12px; }
+    header img { width: 44px; height: 44px; border-radius: 10px; }
+    h1 { font-size: 1.4rem; margin: 0; }
+    header p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+    main { max-width: 560px; margin: 0 auto; display: grid; gap: 14px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 16px;
+    }
+    .card h2 { font-size: 1rem; margin: 0 0 10px; }
+    .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    button {
+      font: inherit; border: 0; border-radius: 12px; padding: 12px 16px;
+      background: var(--accent); color: var(--accent-text); cursor: pointer;
+      min-height: 44px;
+    }
+    button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+    button:active { transform: scale(.97); }
+    .count { font-size: 2.4rem; font-weight: 700; min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
+    .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: .85rem; border: 1px solid var(--border); }
+    .pill.ok { color: var(--ok); border-color: var(--ok); }
+    .pill.bad { color: var(--bad); border-color: var(--bad); }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: .9rem; }
+    dt { color: var(--muted); }
+    dd { margin: 0; word-break: break-word; }
+    form { display: flex; gap: 8px; }
+    input[type=text] {
+      flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    }
+    ul { list-style: none; padding: 0; margin: 10px 0 0; }
+    li { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+    li span { flex: 1; word-break: break-word; }
+    li.done span { text-decoration: line-through; color: var(--muted); }
+    li button { padding: 6px 10px; min-height: 36px; }
+    .hint { color: var(--muted); font-size: .85rem; margin: 8px 0 0; }
+    #installCard[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon-192.png" alt="">
+    <div>
+      <h1>Test App</h1>
+      <p>Running as: <strong id="mode">browser</strong></p>
+    </div>
+  </header>
+
+  <main>
+    <section class="card" id="installCard" hidden>
+      <h2>Install</h2>
+      <button id="installBtn">Add to home screen</button>
+      <p class="hint">Or use the browser menu → “Install app”.</p>
+    </section>
+
+    <section class="card">
+      <h2>Counter</h2>
+      <div class="row">
+        <button class="secondary" id="dec" aria-label="Decrease">−</button>
+        <div class="count" id="count">0</div>
+        <button id="inc" aria-label="Increase">+</button>
+        <button class="secondary" id="reset">Reset</button>
+      </div>
+      <p class="hint">Saved on the device, so it survives restarts.</p>
+    </section>
+
+    <section class="card">
+      <h2>To-do list</h2>
+      <form id="todoForm">
+        <input type="text" id="todoInput" placeholder="Add an item" autocomplete="off" aria-label="New item">
+        <button type="submit">Add</button>
+      </form>
+      <ul id="todoList"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Device check</h2>
+      <div class="row" style="margin-bottom:12px">
+        <span class="pill" id="net">…</span>
+        <button class="secondary" id="vibrate">Vibrate</button>
+        <button class="secondary" id="share">Share</button>
+      </div>
+      <dl id="info"></dl>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const store = {
+      get(key, fallback) {
+        try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
+        catch { return fallback; }
+      },
+      set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+    };
+
+    // Mode: native wrapper (Capacitor APK), installed PWA, or plain browser
+    const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    const isStandalone = matchMedia('(display-mode: standalone)').matches;
+    $('mode').textContent = isNative ? 'Android app (APK)' : isStandalone ? 'installed web app' : 'browser';
+
+    // Counter
+    let count = store.get('count', 0);
+    const renderCount = () => { $('count').textContent = count; store.set('count', count); };
+    $('inc').onclick = () => { count++; renderCount(); };
+    $('dec').onclick = () => { count--; renderCount(); };
+    $('reset').onclick = () => { count = 0; renderCount(); };
+    renderCount();
+
+    // To-do list
+    let todos = store.get('todos', []);
+    function renderTodos() {
+      const list = $('todoList');
+      list.replaceChildren();
+      todos.forEach((t, i) => {
+        const li = document.createElement('li');
+        if (t.done) li.className = 'done';
+        const text = document.createElement('span');
+        text.textContent = t.text;
+        const toggle = document.createElement('button');
+        toggle.className = 'secondary';
+        toggle.textContent = t.done ? 'Undo' : 'Done';
+        toggle.onclick = () => { todos[i].done = !todos[i].done; renderTodos(); };
+        const del = document.createElement('button');
+        del.className = 'secondary';
+        del.textContent = '✕';
+        del.setAttribute('aria-label', 'Delete');
+        del.onclick = () => { todos.splice(i, 1); renderTodos(); };
+        li.append(text, toggle, del);
+        list.append(li);
+      });
+      store.set('todos', todos);
+    }
+    $('todoForm').onsubmit = (e) => {
+      e.preventDefault();
+      const text = $('todoInput').value.trim();
+      if (!text) return;
+      todos.push({ text, done: false });
+      $('todoInput').value = '';
+      renderTodos();
+    };
+    renderTodos();
+
+    // Device check
+    function renderNet() {
+      const el = $('net');
+      el.textContent = navigator.onLine ? 'Online' : 'Offline';
+      el.className = 'pill ' + (navigator.onLine ? 'ok' : 'bad');
+    }
+    addEventListener('online', renderNet);
+    addEventListener('offline', renderNet);
+    renderNet();
+
+    $('vibrate').onclick = () => {
+      if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
+      else alert('Vibration is not supported here.');
+    };
+    $('share').onclick = async () => {
+      const data = { title: 'Test App', text: 'Trying out my test app.', url: location.href.startsWith('http') ? location.href : undefined };
+      if (navigator.share) { try { await navigator.share(data); } catch {} }
+      else alert('Sharing is not supported here.');
+    };
+
+    function renderInfo() {
+      const rows = {
+        Screen: `${screen.width}×${screen.height} @${devicePixelRatio}x`,
+        Viewport: `${innerWidth}×${innerHeight}`,
+        Language: navigator.language,
+        Touch: navigator.maxTouchPoints > 0 ? `yes (${navigator.maxTouchPoints} points)` : 'no',
+        'User agent': navigator.userAgent
+      };
+      const dl = $('info');
+      dl.replaceChildren();
+      for (const [k, v] of Object.entries(rows)) {
+        const dt = document.createElement('dt'); dt.textContent = k;
+        const dd = document.createElement('dd'); dd.textContent = v;
+        dl.append(dt, dd);
+      }
+    }
+    addEventListener('resize', renderInfo);
+    renderInfo();
+
+    // PWA: offline support + install prompt (not needed inside the APK)
+    if (!isNative && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('sw.js');
+    }
+    let deferredPrompt = null;
+    addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      $('installCard').hidden = false;
+    });
+    $('installBtn').onclick = async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      $('installCard').hidden = true;
+    };
+    addEventListener('appinstalled', () => { $('installCard').hidden = true; });
+  </script>
+</body>
+</html>

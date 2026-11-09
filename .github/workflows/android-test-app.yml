@@ -1,0 +1,64 @@
+name: Build Android test app
+
+on:
+  push:
+    paths:
+      - "android-test-app/**"
+      - ".github/workflows/android-test-app.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-test-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: android-test-app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Android project
+        run: |
+          npx cap add android
+          ./scripts/apply-icon.sh
+          npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android-test-app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk test-app.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-app-apk
+          path: android-test-app/test-app.apk
+
+      - name: Publish to the "android-test-app-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=android-test-app-latest
+          gh release delete "$TAG" --cleanup-tag --yes || true
+          gh release create "$TAG" test-app.apk \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Android test app (latest build)" \
+            --notes "Debug APK built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA::7}. Open this page on your Android phone, tap **test-app.apk**, and allow installing from your browser when asked."
