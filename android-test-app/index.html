@@ -125,10 +125,9 @@
       set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
     };
 
-    // Mode: native wrapper (Capacitor APK), installed PWA, or plain browser
-    const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    // Opened from the home-screen icon, or in a normal browser tab?
     const isStandalone = matchMedia('(display-mode: standalone)').matches;
-    $('mode').textContent = isNative ? 'Android app (APK)' : isStandalone ? 'installed web app' : 'browser';
+    $('mode').textContent = isStandalone ? 'home-screen app' : 'browser';
 
     // Counter
     let count = store.get('count', 0);
@@ -211,8 +210,8 @@
     addEventListener('resize', renderInfo);
     renderInfo();
 
-    // PWA: offline support + install prompt (not needed inside the APK)
-    if (!isNative && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    // Offline support + install prompt
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       navigator.serviceWorker.register('sw.js');
     }
     let deferredPrompt = null;
