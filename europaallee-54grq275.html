@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>Europaallee: Tracks to Google</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="A GPS audio walk along Zurich's Europaallee: 15 one-minute stops on railway land, the Sihlpost, Google's campus and who owns the buildings.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  /* Layout: map on top, walk controls and stops below, player docked to the bottom.
+     Zurich blue accent. */
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1e2925;
+    --muted: #5d6a65;
+    --line: #e2ded5;
+    --rose: #1d5a96;
+    --me: #1a73e8;
+    --chip: #eeebe3;
+    --display: "Marcellus", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+  .mapwrap { position: relative; }
+  #map { height: 42vh; height: 42svh; min-height: 260px; background: var(--chip); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: 18px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
+  .eyebrow { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 2rem; line-height: 1.1; margin: 2px 0 4px; text-wrap: balance; }
+  .lede { margin: 0; color: var(--muted); }
+  .back { color: var(--rose); font-weight: 600; text-decoration: none; font-size: .9rem; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 16px; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+  button.primary { background: var(--rose); border-color: var(--rose); color: #fff; font-size: 1.05rem; padding: 12px 22px; }
+  .badge { display: inline-block; background: var(--rose); color: #fff; border-radius: 6px; padding: 1px 8px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; vertical-align: 2px; }
+
+  .start { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .start p { margin: 0; font-size: .95rem; }
+  .start .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .92rem; color: var(--muted); }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--rose); }
+  .speed { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .speed button { border: 0; border-radius: 0; padding: 5px 12px; background: transparent; font-variant-numeric: tabular-nums; }
+  .speed button[aria-pressed="true"] { background: var(--chip); }
+
+  .next { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 12px; align-items: center; background: var(--chip); border-radius: 14px; padding: 14px; }
+  .next .arrow { width: 44px; height: 44px; border-radius: 50%; background: var(--me); color: #fff; display: grid; place-items: center; font-size: 20px; }
+  .next b { display: block; font-size: 1.05rem; }
+  .next span { color: var(--muted); font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .banner { background: #fff4d6; border: 1px solid #e8cf86; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+  ol.stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .stop { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 12px; align-items: start; }
+  .stop.playing { border-color: var(--rose); box-shadow: 0 0 0 2px color-mix(in srgb, var(--rose) 25%, transparent); }
+  .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--rose); color: #fff; font-weight: 700; font-size: .85rem; }
+  .stop.heard .num { background: var(--muted); }
+  .stop h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+  .meta { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .meta .d { color: var(--me); font-weight: 600; }
+  .stop p.look { margin: 6px 0 0; font-size: .93rem; }
+  .vocab:empty { display: none; }
+  .howto { margin: 10px 0 0; padding: 10px 12px; background: var(--chip); border-radius: 10px; font-size: .9rem; }
+  .howto b { display: block; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--rose); margin-bottom: 2px; }
+  .howto a { color: var(--me); font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .next p { margin: 6px 0 0; font-size: .92rem; }
+  .next a { color: var(--me); font-weight: 600; text-decoration: none; }
+  .vocab { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .vocab li { background: var(--chip); border-radius: 8px; padding: 3px 9px; font-size: .85rem; }
+  .vocab li i { color: var(--muted); font-style: normal; }
+  .stop details { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+  .stop summary { cursor: pointer; font-weight: 600; color: var(--rose); }
+  .stop details p { margin: 6px 0 0; white-space: pre-line; }
+  .play { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: var(--chip); border: 0; }
+  .play svg { width: 18px; height: 18px; }
+  .fine { font-size: .8rem; color: var(--muted); margin: 0; }
+
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .player .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: auto minmax(0,1fr); gap: 10px; align-items: center; }
+  .player .ctl { display: flex; align-items: center; gap: 4px; }
+  .player .sk { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; border: 0; background: var(--chip); color: var(--ink); }
+  .player .sk svg { width: 16px; height: 16px; }
+  .player .nx { display: flex; gap: 6px; align-items: baseline; width: 100%; margin-top: 4px; padding: 0; border: 0; background: none; text-align: left; font-weight: 400; font-size: .82rem; color: var(--me); }
+  .player .nx span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .player .nx b { white-space: nowrap; }
+  .player .way { max-width: 720px; margin: 0 auto 8px; background: var(--chip); border-radius: 12px; padding: 10px 12px; font-size: .9rem; max-height: 40vh; overflow: auto; }
+  .player .way p { margin: 4px 0 6px; }
+  .player .way a { color: var(--me); font-weight: 600; text-decoration: none; }
+  .player .pp { width: 52px; height: 52px; padding: 0; display: grid; place-items: center; background: var(--rose); border-color: var(--rose); color: #fff; }
+  .player .pp svg { width: 22px; height: 22px; }
+  .player .t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--chip); border-radius: 2px; margin-top: 6px; overflow: hidden; cursor: pointer; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--rose); }
+  .time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
+
+  .pin { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 700 13px/1 var(--body); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: var(--rose); }
+  .pin.heard { background: var(--muted); }
+  .pin.now { background: var(--ink); transform: scale(1.2); }
+  .locate { position: absolute; z-index: 500; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 16px; width: 48px; height: 48px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.25); color: var(--muted); }
+  .locate svg { width: 22px; height: 22px; }
+  .locate.on { color: var(--me); }
+  .locate.follow { background: var(--me); color: #fff; border-color: var(--me); }
+  .gpschip { position: absolute; z-index: 500; left: max(12px, env(safe-area-inset-left, 0px)); top: 12px; background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: .85rem; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.2); font-variant-numeric: tabular-nums; }
+  .me-wrap { position: relative; width: 18px; height: 18px; }
+  .me-cone { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin-left: -9px; margin-top: -30px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid color-mix(in srgb, var(--me) 55%, transparent); transform-origin: 50% 30px; }
+  .me-dot { position: absolute; inset: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 30%, transparent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .me-dot { animation: pulse 2s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--me) 45%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+  }
+</style>
+</head>
+<body>
+<div class="mapwrap">
+  <div id="map" role="region" aria-label="Map of the walk"></div>
+  <div class="gpschip" id="gpsChip" hidden>📍 <span id="gpsChipTxt"></span></div>
+  <button class="locate" id="locateBtn" type="button" aria-label="Show my location">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+  </button>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow" style="margin-top:10px">Zürich HB → Europaallee → Langstrasse · audio walk</div>
+    <h1>Europaallee: Tracks to Google</h1>
+    <p class="lede">Fifteen one-minute stops along about 1.5 km, from the square behind Zürich HB to the Langstrasse: 150 years of railway and post, the Sihlpost of 1930, a failed mega-project, the teachers' college, UBS, Google's campus, and who actually owns the buildings Google rents. Every stop has a small 🔎 Find it. Each story starts by itself when you arrive.</p>
+  </header>
+
+  <div class="start">
+    <p><b>Before you start:</b> turn the volume up, or share earbuds. Keep this page open with the screen on. Phones pause GPS when the browser is in the background.</p>
+    <div class="row">
+      <button class="primary" id="startBtn" type="button">▶ Start the walk</button>
+      <label class="toggle"><input type="checkbox" id="auto" checked> Play automatically on arrival</label>
+    </div>
+    <div class="row">
+      <span class="toggle">Sound</span>
+      <div class="speed" id="edition" role="group" aria-label="Background sound">
+        <button type="button" data-ed="amb">🏙️ City ambience</button><button type="button" data-ed="voice">Voice only</button>
+      </div>
+    </div>
+    <div class="row">
+      <span class="toggle">Speed</span>
+      <div class="speed" role="group" aria-label="Speaking speed">
+        <button type="button" data-r="0.8">0.8×</button><button type="button" data-r="0.9">0.9×</button><button type="button" data-r="1">1×</button>
+      </div>
+    </div>
+    <p class="fine" id="gpsMsg">Starting asks for your location.</p>
+  </div>
+
+  <div class="banner" id="banner" hidden><span id="bannerTxt"></span><button type="button" id="bannerBtn">▶ Play</button></div>
+  <div class="next" id="next" hidden><div class="arrow" aria-hidden="true">➜</div><div style="min-width:0"><b id="nextName"></b><span id="nextDist"></span><p id="nextDir"></p></div></div>
+
+  <ol class="stops" id="stops"></ol>
+
+  <p class="fine">Voice: ElevenLabs (Jessica). Background sounds: ElevenLabs Sound Effects, mixed quietly under the voice; switch to "Voice only" above. The line on the map shows the order of the stops, not every street. Ownership and dates come from SBB, press and architects' sources; a few dates differ between sources. <button type="button" id="resetBtn" style="font-size:.8rem;padding:2px 10px">Reset progress</button></p>
+</div>
+
+<div class="player">
+  <div class="way" id="pWay" hidden><div class="in2"><b id="pWayTitle"></b><p id="pWayText"></p><a id="pWayLink" target="_blank" rel="noopener">Walk here in Maps ↗</a></div></div>
+  <div class="in">
+    <div class="ctl">
+      <button class="sk" id="prevBtn" type="button" aria-label="Previous stop"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="pp" id="ppBtn" type="button" aria-label="Play"><svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+      <button class="sk" id="nextBtn" type="button" aria-label="Next stop"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    </div>
+    <div style="min-width:0">
+      <div class="t" id="pTitle">Tap Start, then walk to stop 1</div>
+      <div class="bar" id="pBar"><i id="pFill"></i></div>
+      <div class="time"><span id="pCur">0:00</span><span id="pDur"></span></div>
+      <button class="nx" id="pNext" type="button" aria-expanded="false"><span id="pNextTxt">Next stop</span> <b id="pWayBtn">Way ▸</b></button>
+    </div>
+  </div>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const STOPS = [{"slug": "01-europaplatz", "name": "Europaplatz: welcome", "sub": "", "lat": 47.37804, "lng": 8.53601, "r": 20, "look": "Behind the main station: where Europaallee begins.", "find": "Find the long, pale stone building on your left with its name, Sihlpost, written high up.", "dir": "Start at Europaplatz, the square at the south-west side of Zürich HB, where Europaallee begins.", "vocab": [], "src": "audio/europaallee/voice/01-europaplatz.mp3", "srcAmb": "audio/europaallee/ambience/01-europaplatz.mp3", "dur": 68, "text": "Stop one. Europaplatz. Welcome to Europaallee. You are standing just behind Zurich's main station. Turn your back to the station hall. In front of you, a long, straight street of new buildings runs west, towards the Langstrasse. Twenty years ago, you could not have stood here. This was railway land. Tracks, sheds, and mail trains, closed to the public. Today it is a whole new district, built between two thousand and nine and about two thousand and twenty, by the Swiss railways themselves. A university, offices, shops, apartments, and the largest Google engineering site outside the United States. A first little challenge. On your left, find the long, pale stone building with its name written high up on it. Sihlpost. That is our next stop."}, {"slug": "02-sihlpost", "name": "The Sihlpost", "sub": "", "lat": 47.3775, "lng": 8.5356, "r": 15, "look": "Zurich's great post office of around 1930, by the brothers Adolf and Heinrich Bräm.", "find": "Guess: in which year did Hiltl, now in the front of the Sihlpost, first open in Zurich?", "dir": "About 70 m. Walk to the long stone Sihlpost on your left and stand near its front corner.", "vocab": [], "src": "audio/europaallee/voice/02-sihlpost.mp3", "srcAmb": "audio/europaallee/ambience/02-sihlpost.mp3", "dur": 68, "text": "Stop two. The Sihlpost. This was Zurich's great post office, built around nineteen thirty by two brothers, the architects Adolf and Heinrich Bräm. It stood right beside the tracks, so that mail could go straight from the trains into the sorting halls. Inside, the engineer Robert Maillart used his famous mushroom columns: concrete pillars that spread out at the top like a mushroom cap, holding up the floors without beams. Maillart is better known for his elegant bridges in the Alps. Today the building is protected. There is still a post office counter inside, and in the front part, a branch of Hiltl, which calls itself the oldest vegetarian restaurant in the world. A question for you. When did Hiltl first open, in Zurich? Nineteen fifty? Nineteen twenty? Eighteen ninety-eight. Vegetarian, long before it was fashionable."}, {"slug": "03-google-arrives", "name": "Google moves into the post office", "sub": "", "lat": 47.37743, "lng": 8.53543, "r": 15, "look": "Since 2015 Google has been at Europaallee; the old Sihlpost was among its first buildings here.", "find": "Find the narrow lane along the side of the Sihlpost, Sihlpostgasse, and look for a Google sign at a door.", "dir": "A few steps: the narrow lane along the side of the Sihlpost, Sihlpostgasse.", "vocab": [], "src": "audio/europaallee/voice/03-google-arrives.mp3", "srcAmb": "audio/europaallee/ambience/03-google-arrives.mp3", "dur": 67, "text": "Stop three. Google moves into the post office. In two thousand and fifteen, Google arrived at Europaallee. And among its first buildings here was this one, the old Sihlpost. Where letters were once sorted by hand, engineers now sort the world's information. It is a nice symbol. For most of the twentieth century, this was where Zurich's messages arrived. Letters, parcels, telegrams. Today the messages travel through cables, and some of the people who build those systems sit right here. Now, a little challenge. Find the narrow lane along the side of the building. It is called Sihlpostgasse. Walk along it slowly, and look at the doors. If you see a small Google sign, you have found one of the entrances. Then come back to the main street, and look for a building of pale stone, with a strict grid of windows."}, {"slug": "04-teachers", "name": "The teachers' college", "sub": "", "lat": 47.37768, "lng": 8.53464, "r": 20, "look": "Zurich University of Teacher Education (PH Zürich), 2012, by Max Dudler: the first new building.", "find": "Count the identical windows along one floor of the pale stone building.", "dir": "About 150 m. Follow Sihlpostgasse to Lagerstrasse and the pale stone college at Lagerstrasse 2.", "vocab": [], "src": "audio/europaallee/voice/04-teachers.mp3", "srcAmb": "audio/europaallee/ambience/04-teachers.mp3", "dur": 65, "text": "Stop four. The teachers' college. The first new building of Europaallee was not for a bank, and not for Google. It was for teachers. In two thousand and twelve, the Zurich University of Teacher Education moved here. Future primary and secondary school teachers, thousands of students, right next to the station. The architect, Max Dudler, later also renovated the Sihlpost. Look at the facades. Pale stone, a strict grid of tall windows, all the same. Calm, serious, almost classical. Can you count the windows along one floor of the building in front of you? Don't worry about the exact number. The point is the rhythm. Repetition, order, a very Swiss kind of beauty. Now walk back to Europaallee, the main street, and stop near the bookshop."}, {"slug": "05-tracks", "name": "A hundred and fifty years of tracks", "sub": "", "lat": 47.37843, "lng": 8.53516, "r": 20, "look": "Before Europaallee: about 150 years of railway and postal land, closed to the public.", "find": "Guess what the name of the street behind these buildings, Lagerstrasse, means.", "dir": "About 150 m. Walk back north to Europaallee, the main street, and stop near the bookshop at number 8.", "vocab": [], "src": "audio/europaallee/voice/05-tracks.mp3", "srcAmb": "audio/europaallee/ambience/05-tracks.mp3", "dur": 65, "text": "Stop five. A hundred and fifty years of tracks. Imagine this place a hundred years ago. Steam, smoke, the clatter of wagons. From the middle of the nineteenth century, for about a hundred and fifty years, this land belonged to the railway and the post. Sidings, sheds, a postal station where mail trains were loaded day and night. A city inside the city, closed to the public. A question. The street on the other side of these buildings is called Lagerstrasse. What do you think it means? Warehouse Street. When the post moved its sorting to new centres outside the city, this land suddenly became free. The old postal station was torn down in two thousand and nine. And the railway found itself owning some of the most valuable land in Switzerland."}, {"slug": "06-eurogate", "name": "The project that failed", "sub": "", "lat": 47.37852, "lng": 8.5342, "r": 20, "look": "HB Südwest and Eurogate: a giant plan abandoned in 2001; a new plan approved by voters in 2006.", "find": "Look down the street: find the far end of Europaallee.", "dir": "About 80 m west along Europaallee.", "vocab": [], "src": "audio/europaallee/voice/06-eurogate.mp3", "srcAmb": "audio/europaallee/ambience/06-eurogate.mp3", "dur": 67, "text": "Stop six. The project that failed. The first plan for this land was much bigger. It was called HB Südwest, and later Eurogate. A huge development, partly built over the tracks, with an office tower between the station and the Sihlpost. It went through years of planning, objections, and changing economic times. In two thousand and one, it was finally abandoned. Then the railway, the post, and the city started again. Smaller. Open streets instead of one giant block. A master plan by the Dutch planner Kees Christiaanse. In two thousand and six, Zurich voted on it, and about two thirds said yes. Look down the street. Can you see where it ends? Straight, open, with a view all the way through. That openness is the lesson of the failed project."}, {"slug": "07-landlord", "name": "The railway as landlord", "sub": "", "lat": 47.3788, "lng": 8.53348, "r": 20, "look": "Who owns Europaallee? Mostly SBB, the Swiss Federal Railways. Google is a tenant.", "find": "Find the house number on the building beside you: is it 24?", "dir": "About 70 m further west: number 24, on the right.", "vocab": [], "src": "audio/europaallee/voice/07-landlord.mp3", "srcAmb": "audio/europaallee/ambience/07-landlord.mp3", "dur": 62, "text": "Stop seven. The railway as landlord. So who owns all this? Mostly, the Swiss Federal Railways. The SBB. The railway developed Europaallee, invested well over a billion francs, and kept most of the buildings. Google is a tenant. A very big one. When Google signed, newspapers said its space here was about the size of ten football fields. Why would a railway become a landlord? BECAUSE the rent helps pay for the trains. The SBB's property business earns money that goes back into the railway and its pension fund. So every month, when the rent is paid here, a train somewhere in Switzerland gets a little help. Find the house number on the building beside you. If it says twenty-four, you are standing at one of Google's doors."}, {"slug": "08-ubs", "name": "The bank that owns its house", "sub": "", "lat": 47.37861, "lng": 8.53322, "r": 20, "look": "Europaallee 21: built for UBS and owned by UBS, completed around 2013.", "find": "Find the bank's logo of three keys.", "dir": "Just across and a few steps on: number 21.", "vocab": [], "src": "audio/europaallee/voice/08-ubs.mp3", "srcAmb": "audio/europaallee/ambience/08-ubs.mp3", "dur": 62, "text": "Stop eight. The bank that owns its house. The large building here, at number twenty-one, is different from most of its neighbours. It belongs to the people who use it. UBS, Switzerland's biggest bank, commissioned it, and moved in around two thousand and thirteen. Most of Europaallee belongs to the railway, as you just heard. This building is one of the exceptions. Now, find the bank's logo, somewhere near an entrance. Three keys. The keys are said to stand for three values: confidence, security, and discretion. In a city of banks, a fitting symbol for a building that, unlike its neighbours, nobody rents. Now continue along Europaallee, a little further west."}, {"slug": "09-campus", "name": "The Google campus", "sub": "", "lat": 47.37901, "lng": 8.53255, "r": 20, "look": "Google's Europaallee campus: from 2015, officially opened in June 2022; about 5,000 Google people in Zurich.", "find": "Count the Google doors you can spot from where you stand.", "dir": "About 90 m west along Europaallee: number 36.", "vocab": [], "src": "audio/europaallee/voice/09-campus.mp3", "srcAmb": "audio/europaallee/ambience/09-campus.mp3", "dur": 63, "text": "Stop nine. The Google campus. Around you, several buildings belong to Google's Zurich campus. Here at number thirty-six, at number twenty-four behind you, in the old Sihlpost, and further on, at Gustav-Gull-Platz and on Lagerstrasse. Google moved in step by step from two thousand and fifteen, and officially opened the finished campus in June twenty twenty-two. About five thousand people work for Google in Zurich, from more than eighty countries. Together with the older office in Enge, it is Google's largest engineering centre outside the United States. A little challenge. Count the Google doors you can spot from where you stand. And if you are a Googler yourself, you may have walked through one of them this very morning."}, {"slug": "10-brewery", "name": "Slides, gondolas and a brewery", "sub": "", "lat": 47.37905, "lng": 8.53205, "r": 20, "look": "Before Europaallee: Google Zurich began in 2004 by the Limmat and moved into the old Hürlimann brewery in 2008.", "find": "Guess: where was Google's very first Zurich office?", "dir": "A few steps further west along Europaallee.", "vocab": [], "src": "audio/europaallee/voice/10-brewery.mp3", "srcAmb": "audio/europaallee/ambience/10-brewery.mp3", "dur": 64, "text": "Stop ten. Slides, gondolas, and a brewery. Google's Zurich people call themselves Zooglers. And their first big office, in the old Hürlimann brewery in Enge, became famous around the world. Photos showed a slide between floors, and old ski-lift gondolas used as meeting rooms. Google moved into the brewery in two thousand and eight, and it is still a Google office today. There too, Google is a tenant. The owner is a Swiss property company, PSP Swiss Property. A question to guess. Where was Google's very first Zurich office, in two thousand and four? A garage? A castle? A small office on the Limmatquai, by the river, with just two people. From two people, to five thousand, in about twenty years."}, {"slug": "11-gull", "name": "Gustav-Gull-Platz", "sub": "", "lat": 47.37914, "lng": 8.5315, "r": 20, "look": "The square is named after Gustav Gull, architect of the Swiss National Museum (the castle behind the station).", "find": "Find the street sign with his name, and the Google entrance at Gustav-Gull-Platz 1.", "dir": "About 40 m: the square, Gustav-Gull-Platz.", "vocab": [], "src": "audio/europaallee/voice/11-gull.mp3", "srcAmb": "audio/europaallee/ambience/11-gull.mp3", "dur": 55, "text": "Stop eleven. Gustav-Gull-Platz. This square is named after an architect, Gustav Gull. Around nineteen hundred, he shaped Zurich. His most famous building is just behind the main station: the Swiss National Museum, the one that looks like a fairy-tale castle, with towers and turrets. He also built large city offices and the Urania observatory tower. So the newest square in Zurich carries the name of a man who built the city of more than a hundred years ago. Old and new, side by side, like everything here. Find the street sign with his name. And then, find another Google entrance: number one, Gustav-Gull-Platz."}, {"slug": "12-tower", "name": "Living on top", "sub": "", "lat": 47.379, "lng": 8.5312, "r": 20, "look": "The tallest building of Europaallee: about 60 m, 17 floors, and it is apartments, not offices.", "find": "Find the tallest building and count its floors: 17?", "dir": "Stay at the square and look up at the towers.", "vocab": [], "src": "audio/europaallee/voice/12-tower.mp3", "srcAmb": "audio/europaallee/ambience/12-tower.mp3", "dur": 57, "text": "Stop twelve. Living on top. Look up. Near this square stand the tallest buildings of Europaallee. The highest is about sixty metres, seventeen floors. And it is NOT an office tower. It is homes. That was part of the idea. Not only offices. People living here too, so that the street stays alive in the evening, and does not empty out at six. Can you find the tallest one? Count its floors. If you get to seventeen, you have found it. And imagine the view from the top. The tracks, the station roof, the lake, and on a clear day, the Alps. Now walk on, towards the end of the district, and the Lagerstrasse."}, {"slug": "13-block", "name": "A city in one block", "sub": "", "lat": 47.3798, "lng": 8.52973, "r": 20, "look": "The last buildings mix a hotel, offices, apartments, a cinema, a school and a daycare. Google is at Lagerstrasse 100. Streets handed to the city in 2021.", "find": "Find a spot where you could live, work, eat, see a film and drop a child at daycare without crossing a street.", "dir": "About 150 m west to Lagerstrasse 100.", "vocab": [], "src": "audio/europaallee/voice/13-block.mp3", "srcAmb": "audio/europaallee/ambience/13-block.mp3", "dur": 59, "text": "Stop thirteen. A city in one block. The last buildings of Europaallee try to be a small city on their own. In one block near here, there is a hotel, offices, apartments, restaurants, a cinema, a school, and a daycare for small children. Google has offices here too, at Lagerstrasse one hundred. Most of the last buildings were finished around twenty twenty. And in July twenty twenty-one, the railway handed the streets and squares to the City of Zurich. The ground you are walking on is now public. A little challenge. Find a spot where you could, in theory, live, work, eat, watch a film, and drop your child at daycare, without ever crossing a street."}, {"slug": "14-langstrasse", "name": "Langstrasse", "sub": "", "lat": 47.37995, "lng": 8.5285, "r": 20, "look": "Where the new district meets the old Kreis 4: bars, immigrants, nightlife, and the underpass beneath the tracks.", "find": "Find the long underpass where the Langstrasse dives under the railway.", "dir": "About 150 m to the corner of Lagerstrasse and Langstrasse, near the railway underpass.", "vocab": [], "src": "audio/europaallee/voice/14-langstrasse.mp3", "srcAmb": "audio/europaallee/ambience/14-langstrasse.mp3", "dur": 60, "text": "Stop fourteen. Langstrasse. And here the new district meets the old one. Langstrasse. For a century, Zurich's most colourful street. Workers, immigrants, bars, kebab shops, nightlife, and, let's say, a certain reputation. When Europaallee was built, many people worried. Would the glass and stone push out the old Langstrasse? Would rents go up? Many say they did. The debate is still going on. Look towards the tracks. The street dives under the railway in a long underpass. For generations, it has connected the two working-class districts, Kreis four and Kreis five. Find it, and listen. Down there, the trains rumble right over your head."}, {"slug": "15-looking-back", "name": "Looking back", "sub": "", "lat": 47.37995, "lng": 8.5285, "r": 20, "look": "The end: from a closed field of tracks to one of Zurich's busiest streets in about ten years.", "find": "Look back east: can you still see the Sihlpost, where we began?", "dir": "Same place: the end of the walk.", "vocab": [], "src": "audio/europaallee/voice/15-looking-back.mp3", "srcAmb": "audio/europaallee/ambience/15-looking-back.mp3", "dur": 66, "text": "Stop fifteen. Looking back. Turn around, and look back towards the station. Think of what you have seen. A post office from nineteen thirty, now offices and a restaurant. A railway that became a landlord. A bank that owns its own house. A search company from California, renting space where mail trains once stopped. Teachers, families, a cinema, and a square named after the architect of a castle. In just over ten years, a closed field of tracks became one of the busiest streets in Zurich. One last challenge. From here, can you still see the Sihlpost, where we began? Thank you for walking with me. And if you work here, remember: every day at your desk, you are helping to pay for Swiss trains."}];
+const ROUTE = [[47.378053, 8.536018], [47.378033, 8.536093], [47.377999, 8.536072], [47.378013, 8.536018], [47.377815, 8.535878], [47.377789, 8.535849], [47.377809, 8.535811], [47.377874, 8.535685], [47.377897, 8.535641], [47.377863, 8.5356], [47.377838, 8.535572], [47.377809, 8.535628], [47.377764, 8.535717], [47.377768, 8.535721], [47.377745, 8.535766], [47.377742, 8.535762], [47.377685, 8.535874], [47.37767, 8.535925], [47.377643, 8.535894], [47.377455, 8.535689], [47.377355, 8.535579], [47.377643, 8.535894], [47.37767, 8.535925], [47.377685, 8.535874], [47.377742, 8.535762], [47.377745, 8.535766], [47.377768, 8.535721], [47.377764, 8.535717], [47.377809, 8.535628], [47.377838, 8.535572], [47.377863, 8.535524], [47.377957, 8.535339], [47.378087, 8.534992], [47.378083, 8.534989], [47.377703, 8.534592], [47.378083, 8.534989], [47.378087, 8.534992], [47.378134, 8.535032], [47.37822, 8.535104], [47.378053, 8.535622], [47.378269, 8.535765], [47.378401, 8.535146], [47.378588, 8.53427], [47.378522, 8.534196], [47.378588, 8.53427], [47.378753, 8.533459], [47.378833, 8.533067], [47.378771, 8.532976], [47.378713, 8.532891], [47.378645, 8.533235], [47.378713, 8.532891], [47.378771, 8.532976], [47.378781, 8.532931], [47.37879, 8.532887], [47.378828, 8.532943], [47.378881, 8.532693], [47.378967, 8.532507], [47.378881, 8.532693], [47.378828, 8.532943], [47.37879, 8.532887], [47.378981, 8.532017], [47.3791, 8.531481], [47.37913, 8.531342], [47.379006, 8.53119], [47.378986, 8.531166], [47.378962, 8.531138], [47.379042, 8.530986], [47.379308, 8.530465], [47.379549, 8.529944], [47.379601, 8.529825], [47.379685, 8.529625], [47.379775, 8.529409], [47.380057, 8.528732], [47.380191, 8.52841], [47.380236, 8.528288], [47.380145, 8.528207], [47.38007, 8.528141], [47.380013, 8.528252], [47.379913, 8.528174], [47.379913, 8.528174], [47.379913, 8.528174], [47.380013, 8.528252], [47.38007, 8.528141], [47.380079, 8.528078], [47.380073, 8.528029], [47.380046, 8.528006], [47.379966, 8.52796], [47.379718, 8.527813], [47.379682, 8.527799], [47.379656, 8.527801], [47.37964, 8.527819], [47.379598, 8.527799], [47.37956, 8.527779], [47.379414, 8.528069], [47.37931, 8.528276], [47.379298, 8.528301]];
+STOPS.forEach((s, i) => { s.i = i; });
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+const audio = $("audio");
+let heard = new Set(store.get("ea1-heard", [])), triggered = new Set(heard), queue = [], current = -1;
+let me = null, watchId = null, started = false, wakeLock = null, centered = false, follow = true;
+let rate = store.get("ea-rate", 1);
+let edition = store.get("ea-edition", "amb");
+const srcFor = s => edition === "voice" ? s.src : s.srcAmb;
+
+const haversine = (a, b) => { const R = 6371000, t = d => d * Math.PI / 180, dLat = t(b.lat - a.lat), dLng = t(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(t(a.lat)) * Math.cos(t(b.lat)) * Math.sin(dLng / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const fmtDist = m => m < 1000 ? `${Math.round(m / 5) * 5} m` : `${(m / 1000).toFixed(1)} km`;
+const mins = m => Math.max(1, Math.round(m * 1.25 / 75));
+const fmtTime = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "";
+const walkUrl = s => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=walking`;
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* Karte */
+const map = L.map("map", { zoomControl: false }).fitBounds(ROUTE, { padding: [30, 30] });
+L.control.zoom({ position: "topright" }).addTo(map);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+L.polyline(ROUTE, { color: "#8e3b1f", weight: 5, opacity: .55 }).addTo(map);
+const pinGroups = Object.values(STOPS.reduce((g, s) => { const k = s.lat.toFixed(5) + "," + s.lng.toFixed(5); (g[k] = g[k] || []).push(s.i); return g; }, {}));
+const pins = pinGroups.map(g => L.marker([STOPS[g[0]].lat, STOPS[g[0]].lng], { title: g.map(i => STOPS[i].name).join(" + ") }).addTo(map)
+  .on("click", () => { const u = g.find(i => !heard.has(i)); playStop(u === undefined ? g[0] : u, true); }));
+let meMarker = null, meCircle = null, toNext = null;
+function refreshPins() { pinGroups.forEach((g, k) => { const label = (g.length > 2 && g[g.length - 1] - g[0] === g.length - 1) ? `${g[0] + 1}–${g[g.length - 1] + 1}` : g.map(i => i + 1).join("·"), w = Math.max(28, 12 + label.length * 8);
+  const cls = g.includes(current) ? "now" : g.every(i => heard.has(i)) ? "heard" : "";
+  pins[k].setIcon(L.divIcon({ className: "", iconSize: [w, 28], iconAnchor: [w / 2, 14], html: `<div class="pin ${cls}" style="width:${w}px;border-radius:14px">${label}</div>` })); }); }
+map.on("dragstart", () => { follow = false; $("locateBtn").classList.remove("follow"); });
+
+/* Liste */
+const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const pauseSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+function renderList() {
+  $("stops").innerHTML = STOPS.map(s => {
+    const d = me ? `<span class="d">${fmtDist(haversine(me, s))}</span> · ` : "";
+    const now = s.i === current && !audio.paused;
+    return `<li class="stop ${s.i === current ? "playing" : ""} ${heard.has(s.i) ? "heard" : ""}" id="stop-${s.i}">
+      <span class="num">${s.i + 1}</span>
+      <div style="min-width:0">
+        <h3>${esc(s.name)}${s.sub ? ` <span class="meta">· ${esc(s.sub)}</span>` : ""}</h3>
+        <div class="meta">${d}${fmtTime(s.dur)} · ${heard.has(s.i) ? "✓ heard" : "plays on arrival"}</div>
+        <p class="look">${esc(s.look)}</p>
+        ${s.find ? `<div class="howto"><b>🔎 Find it</b> ${esc(s.find)}</div>` : ""}
+        <div class="howto"><b>How to get here</b> ${esc(s.dir)} <a href="${walkUrl(s)}" target="_blank" rel="noopener">Walk here ↗</a></div>
+        <ul class="vocab" aria-label="Vocabulary">${s.vocab.map(([de, en]) => `<li><b>${esc(de)}</b> <i>${esc(en)}</i></li>`).join("")}</ul>
+        <details><summary>Read along</summary><p>${esc(s.text)}</p></details>
+      </div>
+      <button class="play" type="button" data-i="${s.i}" aria-label="${now ? "Pause" : "Play"}: ${esc(s.name)}">${now ? pauseSvg : playSvg}</button></li>`;
+  }).join("");
+  $("stops").querySelectorAll(".play").forEach(b => b.onclick = () => { const i = +b.dataset.i; if (i === current && !audio.paused) audio.pause(); else playStop(i, true); });
+}
+function nextStop() { const reached = Math.max(-1, current, ...triggered); return STOPS.find(s => s.i > reached && !triggered.has(s.i)) || null; }
+function renderNext() {
+  renderPlayerNext();
+  const n = nextStop();
+  $("next").hidden = false;
+  $("nextDir").innerHTML = n ? `${esc(n.dir)} <a href="${walkUrl(n)}" target="_blank" rel="noopener">Walk here ↗</a>` : "";
+  if (!n) { $("nextName").textContent = "You've heard every stop"; $("nextDist").textContent = "Enjoy the evening!"; if (toNext) { toNext.remove(); toNext = null; } return; }
+  $("nextName").textContent = `${started ? "Next" : "First stop"}: ${n.i + 1}. ${n.name}`;
+  if (me) {
+    const d = haversine(me, n); $("nextDist").textContent = `${fmtDist(d)} · about ${mins(d)} min walk`;
+    const ll = [[me.lat, me.lng], [n.lat, n.lng]];
+    if (!toNext) toNext = L.polyline(ll, { color: "#1a73e8", weight: 3, dashArray: "4 8", opacity: .8 }).addTo(map); else toNext.setLatLngs(ll);
+  } else $("nextDist").textContent = started ? "Waiting for GPS…" : "Tap Start when you're ready";
+}
+
+/* Audio */
+function setPlayerUi() {
+  const s = STOPS[current];
+  $("pTitle").textContent = s ? `${s.i + 1}. ${s.name}` : (started ? "Walk on to the next stop" : "Tap Start, then walk to stop 1");
+  $("ppIcon").innerHTML = audio.paused || !s ? '<path d="M7 4.5v15l13-7.5z"/>' : '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+  $("ppBtn").setAttribute("aria-label", audio.paused ? "Play" : "Pause");
+}
+function playStop(i, user) {
+  const s = STOPS[i];
+  queue = queue.filter(q => q !== i); triggered.add(i); current = i; lastIdx = i;
+  audio.src = srcFor(s); audio.playbackRate = rate;
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: "Europaallee: Tracks to Google", album: "Europaallee" });
+  audio.play().then(() => { $("banner").hidden = true; }).catch(() => { $("bannerTxt").textContent = `You've reached ${s.name}.`; $("banner").hidden = false; });
+  if (user) map.panTo([s.lat, s.lng]);
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+}
+$("bannerBtn").onclick = () => { audio.play().catch(() => {}); $("banner").hidden = true; };
+$("ppBtn").onclick = () => { if (current < 0) { const n = nextStop() || STOPS[0]; playStop(n.i, true); return; } if (audio.paused) audio.play().catch(() => {}); else audio.pause(); };
+audio.addEventListener("play", () => { audio.playbackRate = rate; setPlayerUi(); renderList(); });
+audio.addEventListener("pause", () => { setPlayerUi(); renderList(); });
+audio.addEventListener("timeupdate", () => { if (!audio.duration || current < 0) return; $("pFill").style.width = `${audio.currentTime / audio.duration * 100}%`; $("pCur").textContent = fmtTime(audio.currentTime); $("pDur").textContent = fmtTime(audio.duration); });
+$("pBar").onclick = e => { if (audio.duration) { const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; } };
+audio.addEventListener("ended", () => {
+  if (current >= 0) { heard.add(current); store.set("ea1-heard", [...heard]); }
+  current = -1; $("pFill").style.width = "0"; $("pCur").textContent = "0:00"; $("pDur").textContent = "";
+  refreshPins(); renderList(); setPlayerUi(); renderNext();
+  if (queue.length) playStop(queue.shift(), false);
+});
+function renderSpeed() { document.querySelectorAll(".speed:not(#edition) button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.r === rate)); }
+function renderEdition() { document.querySelectorAll("#edition button").forEach(b => b.setAttribute("aria-pressed", b.dataset.ed === edition)); }
+document.querySelectorAll("#edition button").forEach(b => b.onclick = () => {
+  edition = b.dataset.ed; store.set("ea-edition", edition); renderEdition();
+  if (current >= 0 && audio.src && !audio.src.endsWith("silence.mp3")) { const t = audio.currentTime, playing = !audio.paused; audio.src = srcFor(STOPS[current]); audio.playbackRate = rate; audio.addEventListener("loadedmetadata", () => { audio.currentTime = t; if (playing) audio.play().catch(() => {}); }, { once: true }); }
+});
+renderEdition();
+document.querySelectorAll(".speed:not(#edition) button").forEach(b => b.onclick = () => { rate = +b.dataset.r; store.set("ea-rate", rate); audio.playbackRate = rate; renderSpeed(); });
+
+/* GPS */
+function onPos(pos) {
+  me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+  const ll = [me.lat, me.lng], hd = pos.coords.heading, moving = (pos.coords.speed || 0) > 0.4;
+  const cone = typeof hd === "number" && !isNaN(hd) && moving ? `<div class="me-cone" style="transform:rotate(${hd}deg)"></div>` : "";
+  const icon = L.divIcon({ className: "", html: `<div class="me-wrap">${cone}<div class="me-dot"></div></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+  if (!meMarker) {
+    meCircle = L.circle(ll, { radius: me.acc, color: "#1a73e8", weight: 1, fillOpacity: .1, interactive: false }).addTo(map);
+    meMarker = L.marker(ll, { icon, zIndexOffset: 1000, title: "You are here" }).addTo(map);
+  } else { meMarker.setLatLng(ll).setIcon(icon); meCircle.setLatLng(ll).setRadius(me.acc); }
+  if (!centered) { map.setView(ll, 17); centered = true; } else if (follow) map.panTo(ll);
+  $("locateBtn").classList.add("on"); $("locateBtn").classList.toggle("follow", follow);
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = `You · ±${Math.round(me.acc)} m`;
+  $("gpsMsg").textContent = `GPS on · accurate to about ${Math.round(me.acc)} m`;
+  if (started && $("auto").checked) STOPS.forEach(s => {
+    if (triggered.has(s.i)) return;
+    if (haversine(me, s) <= s.r + Math.min(me.acc, 20)) {
+      triggered.add(s.i);
+      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      if (current < 0) playStop(s.i, false); else if (!queue.includes(s.i)) queue.push(s.i);
+    }
+  });
+  renderList(); renderNext();
+}
+function onErr(e) {
+  if (!me) { $("gpsChip").hidden = false; $("gpsChipTxt").textContent = e.code === 1 ? "Location blocked" : "Looking for GPS…"; }
+  $("gpsMsg").textContent = e.code === 1 ? "Location was refused. Allow it for this site in your browser settings, then reload. You can still tap ▶ on any stop." : "Still looking for GPS. Tall walls can get in the way.";
+  if (e.code === 1 && watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+function startGps() {
+  if (watchId !== null) return;
+  if (!("geolocation" in navigator)) { $("gpsMsg").textContent = "This browser can't share location."; return; }
+  $("gpsChip").hidden = false; $("gpsChipTxt").textContent = "Finding you…";
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+$("locateBtn").onclick = () => { startGps(); follow = true; $("locateBtn").classList.add("follow"); if (me) map.setView([me.lat, me.lng], Math.max(map.getZoom(), 17)); };
+try { navigator.permissions?.query({ name: "geolocation" }).then(st => { if (st.state === "granted") startGps(); }).catch(() => {}); } catch (e) {}
+async function keepAwake() { try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (started && document.visibilityState === "visible") keepAwake(); });
+
+$("startBtn").onclick = () => {
+  started = true;
+  audio.src = "audio/silence.mp3";   // Kurzer stummer Ton im Tipp, damit das Handy später automatisch abspielen darf.
+  audio.play().catch(() => {}).finally(() => { startGps(); if (me) onPos({ coords: { latitude: me.lat, longitude: me.lng, accuracy: me.acc } }); });
+  keepAwake();
+  $("startBtn").textContent = "Walking ✓"; $("startBtn").disabled = true;
+  setPlayerUi(); renderNext();
+};
+$("resetBtn").onclick = () => { heard = new Set(); triggered = new Set(); queue = []; store.set("ea1-heard", []); refreshPins(); renderList(); renderNext(); };
+
+/* Player: previous / next stop, and the way to the next stop without scrolling */
+let lastIdx = -1;
+const cursor = () => current >= 0 ? current : (lastIdx >= 0 ? lastIdx : (nextStop() ? nextStop().i - 1 : -1));
+function upcoming() { const c = cursor(); return STOPS[Math.min(STOPS.length - 1, c + 1)] && c + 1 < STOPS.length ? STOPS[c + 1] : null; }
+function renderPlayerNext() {
+  const n = upcoming();
+  if (!n) { $("pNextTxt").textContent = "That was the last stop. Grazie!"; $("pWayBtn").hidden = true; $("pWay").hidden = true; return; }
+  $("pWayBtn").hidden = false;
+  const here = me ? haversine(me, n) : null;
+  const same = current >= 0 && STOPS[current] && STOPS[current].lat === n.lat && STOPS[current].lng === n.lng;
+  $("pNextTxt").textContent = `Next: ${n.i + 1}. ${n.name}` + (same ? " · right here" : here !== null ? ` · ${fmtDist(here)} · ${mins(here)} min` : "");
+  $("pWayTitle").textContent = `${n.i + 1}. ${n.name}`;
+  $("pWayText").textContent = n.dir || "";
+  $("pWayLink").href = walkUrl(n);
+}
+$("pNext").onclick = () => { const open = $("pWay").hidden; $("pWay").hidden = !open; $("pWayBtn").textContent = open ? "Way ▾" : "Way ▸"; $("pNext").setAttribute("aria-expanded", open); };
+$("prevBtn").onclick = () => { const c = cursor(); if (c > 0) playStop(c - 1, true); };
+$("nextBtn").onclick = () => { const c = cursor(); if (c + 1 < STOPS.length) playStop(c + 1, true); };
+if ("mediaSession" in navigator) { try { navigator.mediaSession.setActionHandler("previoustrack", () => $("prevBtn").onclick()); navigator.mediaSession.setActionHandler("nexttrack", () => $("nextBtn").onclick()); } catch (e) {} }
+
+renderSpeed(); refreshPins(); renderList(); setPlayerUi(); renderPlayerNext();
+</script>
+</body>
+</html>
