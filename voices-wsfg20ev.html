@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Three Voices Compared</title>
+<style>
+  :root { --bg:#f6f4ef; --panel:#fff; --ink:#1e2925; --muted:#5d6a65; --line:#e2ded5; --green:#2f6b57; --chip:#eeebe3; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141816; --panel:#1d2320; --ink:#e9ece9; --muted:#9aa6a1; --line:#2e3632; --green:#6fb79c; --chip:#262d2a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:24px 16px 48px; display:flex; flex-direction:column; gap:14px; }
+  h1 { font-size:1.9rem; line-height:1.15; margin:4px 0 0; }
+  .lede { color:var(--muted); margin:0; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .top { display:flex; gap:12px; align-items:center; }
+  .n { width:36px; height:36px; flex:none; border-radius:10px; display:grid; place-items:center; background:var(--green); color:#fff; font-weight:700; }
+  h2 { margin:0; font-size:1.15rem; }
+  .meta, .how, .note { font-size:.88rem; color:var(--muted); margin:0; }
+  .note { color:var(--ink); }
+  code { background:var(--chip); padding:1px 5px; border-radius:5px; font-size:.85em; }
+  audio { width:100%; }
+  details { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px; font-size:.92rem; }
+  summary { cursor:pointer; font-weight:600; color:var(--green); }
+  pre { white-space:pre-wrap; font:inherit; color:var(--muted); margin:8px 0 0; }
+  .fine { font-size:.8rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<div class="fine">Voice test · November 2026</div>
+<h1>Three voices, one text</h1>
+<p class="lede">The same 50-second opening about Siena, read by the newest speech model of ElevenLabs, OpenAI and Google Gemini. Each was asked for the same thing: a calm, warm, slow lecturer with a neutral American accent, long pauses after questions, and a few short stresses. Listen to all three and compare pace, pauses, warmth and how natural the stresses sound.</p>
+<article class="card">
+  <div class="top"><span class="n">1</span><div><h2>ElevenLabs</h2><div class="meta"><code>eleven_v4</code> · voice Jessica · 0:52</div></div></div>
+  <audio controls preload="none" src="audio/voice-compare/elevenlabs.mp3"></audio>
+  <p class="how">Text with audio tags: <code>[pauses]</code>, <code>[long pause]</code>, one CAPITALISED stress word. Settings: stability 0.45, similarity 0.75. MP3 44.1 kHz, 192 kbps, raw.</p>
+  <p class="note">The voice used for all the Florence and Siena guides.</p>
+</article>
+<article class="card">
+  <div class="top"><span class="n">2</span><div><h2>OpenAI</h2><div class="meta"><code>gpt-4o-mini-tts-2025-12-15</code> · voice Marin · 0:45</div></div></div>
+  <audio controls preload="none" src="audio/voice-compare/openai.mp3"></audio>
+  <p class="how">Plain text plus written style instructions (the <code>instructions</code> field). MP3 24 kHz, as delivered.</p>
+  <p class="note">Newest OpenAI speech model; Marin is one of its newest voices.</p>
+</article>
+<article class="card">
+  <div class="top"><span class="n">3</span><div><h2>Google Gemini</h2><div class="meta"><code>gemini-3.8-flash-tts</code> · voice Sulafat (“warm”) · 0:57</div></div></div>
+  <audio controls preload="none" src="audio/voice-compare/gemini.mp3"></audio>
+  <p class="how">Plain text with the same style instructions in the prompt. Delivered as 24 kHz WAV; converted once to MP3 192 kbps for the web.</p>
+  <p class="note">Newest Gemini speech model.</p>
+</article>
+<details><summary>The text and the instructions</summary>
+<pre><b>ElevenLabs text (with audio tags)</b>
+[calm] Hello, dear friends. Today we&#x27;re going to talk about Siena... and I want to begin with a question. [long pause] What IS Siena? [long pause] A museum? [pauses] A pretty little town on a hill, with a famous horse race? [long pause] ACTUALLY... neither. [long pause] Siena is a city that once wanted to be the greatest city in Europe. [long pause] And in a strange way, it lost everything. [pauses] In thirteen forty-eight, the Black Death arrived. [pauses] In a few months, more than half of the city died. [long pause] The great new cathedral was never finished. [pauses] You can still see its empty walls, standing against the sky. [pauses] A dream, frozen in stone. [long pause] And it is precisely BECAUSE it lost, [pauses] that it is so beautiful today.
+
+<b>OpenAI and Gemini text</b>
+Hello, dear friends. Today we&#x27;re going to talk about Siena... and I want to begin with a question.
+
+What is Siena?
+
+A museum? A pretty little town on a hill, with a famous horse race?
+
+Actually... neither.
+
+Siena is a city that once wanted to be the greatest city in Europe. And in a strange way, it lost everything. In thirteen forty-eight, the Black Death arrived. In a few months, more than half of the city died.
+
+The great new cathedral was never finished. You can still see its empty walls, standing against the sky. A dream, frozen in stone.
+
+And it is precisely because it lost, that it is so beautiful today.
+
+<b>Style instructions (OpenAI and Gemini)</b>
+Voice: a calm, warm, thoughtful lecturer with a neutral American accent. Pace: slow and spacious, about 120 words per minute, with short pauses between phrases and long pauses (one to one and a half seconds) after questions and key sentences. Emphasis: stress &#x27;is&#x27; in &#x27;What is Siena&#x27;, the word &#x27;Actually&#x27;, and &#x27;because&#x27; near the end; stresses are short and crisp, at the start of the phrase. Tone: gently ironic, intimate, never cheerful or salesy.</pre>
+</details>
+<p class="fine">All three files were checked by transcription: every word of the text is read (112 words each), and no tags or instructions are spoken. No editing except Gemini's WAV → MP3 conversion.</p>
+</main>
+</body>
+</html>
